@@ -29,3 +29,31 @@ Open http://localhost:5173
 3. **Home** — upload assets (metadata in `ecm_files`), search by name / owner / date
 
 Backend (S3, DynamoDB, Lambda) can replace `utils/files.js` and `utils/auth.js` later without changing page structure.
+
+Bucket name : aaas-content-vault-2026
+DynamoDB table : DocumentMetadata
+IAM role for lambda : ecm-uploadfiles-role-641px569
+
+generateurl function url : https://trloz5caellu5a4odhzeyesl3y0zwxet.lambda-url.us-east-1.on.aws/
+
+savemetadata function url : https://sdnh3b56ojmfasqplglv6w2ddy0ozvce.lambda-url.us-east-1.on.aws/
+
+https://aaas-content-vault-2026.s3.us-east-1.amazonaws.com/Archival/
+
+
+CSV
+ │
+ ▼
+Frontend
+ │
+ ├── Parse CSV
+ ├── Send rows
+ │
+ ▼
+Lambda
+ │
+ ├── Extract source key
+ ├── Generate UUID
+ ├── Create destination path
+ ├── Copy S3 object
+ └── Return UUID + new S3 path
