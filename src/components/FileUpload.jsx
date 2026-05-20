@@ -181,15 +181,22 @@ export default function FileUpload({ onUploaded }) {
         throw new Error('DocumentType column not found.')
       }
 
-      const filteredRows = rows.map((row) => ({
-        FilePath: row[filePathKey],
-        DocumentType: row[documentTypeKey],
-      }))
+      // Send full CSV row so Lambda can persist all columns (except source FilePath) to DynamoDB.
+      const lambdaRows = rows.map((row) => {
+        const payload = { ...row }
+        if (filePathKey !== 'FilePath') {
+          payload.FilePath = row[filePathKey]
+        }
+        if (documentTypeKey !== 'DocumentType') {
+          payload.DocumentType = row[documentTypeKey]
+        }
+        return payload
+      })
 
-      setParsedHeaders(['FilePath', 'DocumentType'])
-      setParsedRows(filteredRows)
+      setParsedHeaders(headers)
+      setParsedRows(lambdaRows)
 
-      const lambdaResponse = await callCopyLambda(filteredRows)
+      const lambdaResponse = await callCopyLambda(lambdaRows)
       console.log('Lambda Response:', lambdaResponse)
 
       const copiedCount = lambdaResponse.filter((r) => r.status === 'copied').length
@@ -208,7 +215,11 @@ export default function FileUpload({ onUploaded }) {
       setParsedHeaders([])
       e.currentTarget.reset()
 
-      let message = `Copied ${copiedCount} file(s) to Archival via Lambda.`
+      const metadataSavedCount = lambdaResponse.filter(
+        (r) => r.status === 'copied' && r.metadataSaved
+      ).length
+
+      let message = `Copied ${copiedCount} file(s) to Archival and saved ${metadataSavedCount} record(s) to DynamoDB.`
       if (failedCount > 0) {
         message += ` ${failedCount} row(s) failed.`
       }
@@ -225,7 +236,7 @@ export default function FileUpload({ onUploaded }) {
     <form className="upload-card fade-in" onSubmit={handleSubmit}>
       <h3>Upload asset</h3>
       <p className="text-muted">
-        CSV is parsed, then sent to AWS Lambda to copy files into Archival.
+        CSV is parsed, then sent to AWS Lambda to copy files into Archival and save metadata to DynamoDB.
       </p>
 
       <label className="file-drop">
