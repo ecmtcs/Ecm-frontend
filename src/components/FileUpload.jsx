@@ -3,6 +3,41 @@ import { saveFile } from '../utils/files'
 import { getSession } from '../utils/auth'
 
 const METADATA_KEY = 'ecm_metadata'
+const LAMBDA_COPY_URL =
+  'https://trloz5caellu5a4odhzeyesl3y0zwxet.lambda-url.us-east-1.on.aws/'
+
+async function callCopyLambda(rows) {
+  const response = await fetch(LAMBDA_COPY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rows }),
+  })
+
+  let data
+  try {
+    data = await response.json()
+  } catch {
+    throw new Error('Invalid response from Lambda.')
+  }
+
+  if (!response.ok && response.status !== 207) {
+    const message =
+      (typeof data === 'object' && data?.error) ||
+      `Lambda request failed (${response.status}).`
+    throw new Error(message)
+  }
+
+  if (!Array.isArray(data)) {
+    throw new Error('Unexpected response from Lambda.')
+  }
+
+  const failures = data.filter((item) => item.status === 'error')
+  if (failures.length === data.length) {
+    throw new Error(failures[0]?.error || 'All files failed to process.')
+  }
+
+  return data
+}
 
 async function readTextFile(file) {
   return new Promise((resolve, reject) => {
@@ -64,10 +99,11 @@ function saveMetadata(items) {
   }
 }
 
-function buildMetadata(row, fileKey, owner) {
+function buildMetadata(row, fileKey, owner, lambdaResult) {
   return {
     owner,
-    fileUrl: '',
+    fileUrl: lambdaResult?.newS3Path || '',
+    uuid: lambdaResult?.uuid || '',
     uploadedAt: new Date().toISOString(),
     fileName: row[fileKey] || '',
     metadata: Object.entries(row).reduce((acc, [key, value]) => {
@@ -147,45 +183,36 @@ export default function FileUpload({ onUploaded }) {
 
       const filteredRows = rows.map((row) => ({
         FilePath: row[filePathKey],
-        DocumentType: row[documentTypeKey]
+        DocumentType: row[documentTypeKey],
       }))
 
       setParsedHeaders(['FilePath', 'DocumentType'])
       setParsedRows(filteredRows)
-      const response = await fetch(
-        'https://trloz5caellu5a4odhzeyesl3y0zwxet.lambda-url.us-east-1.on.aws/',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            rows: filteredRows
-          })
-        }
-      )
 
-      if (!response.ok) {
-        throw new Error('Failed to process files.')
-      }
-
-      const lambdaResponse = await response.json()
-
+      const lambdaResponse = await callCopyLambda(filteredRows)
       console.log('Lambda Response:', lambdaResponse)
 
-      setStatusMessage(
-        `Successfully processed ${lambdaResponse.length} file(s).`
-      )
+      const copiedCount = lambdaResponse.filter((r) => r.status === 'copied').length
+      const failedCount = lambdaResponse.filter((r) => r.status === 'error').length
 
       const fileKey = getCsvFileKey(headers)
-      const uploadMetadata = rows.map((row) => buildMetadata(row, fileKey, owner))
+      const uploadMetadata = rows.map((row, index) =>
+        buildMetadata(row, fileKey, owner, lambdaResponse[index])
+      )
 
-      await saveMetadata(uploadMetadata)
+      saveMetadata(uploadMetadata)
 
       const savedRecord = saveFile({ name: csvFile.name, owner })
       setCsvFile(null)
+      setParsedRows([])
+      setParsedHeaders([])
       e.currentTarget.reset()
-      setStatusMessage(`CSV parsed and saved locally: ${rows.length} row(s)`)
+
+      let message = `Copied ${copiedCount} file(s) to Archival via Lambda.`
+      if (failedCount > 0) {
+        message += ` ${failedCount} row(s) failed.`
+      }
+      setStatusMessage(message)
       onUploaded(savedRecord)
     } catch (err) {
       setErrorMessage(err.message || 'Upload failed. Please try again.')
@@ -197,7 +224,9 @@ export default function FileUpload({ onUploaded }) {
   return (
     <form className="upload-card fade-in" onSubmit={handleSubmit}>
       <h3>Upload asset</h3>
-      <p className="text-muted">CSV metadata is stored locally in the browser for now.</p>
+      <p className="text-muted">
+        CSV is parsed, then sent to AWS Lambda to copy files into Archival.
+      </p>
 
       <label className="file-drop">
         <div>CSV file</div>
@@ -209,7 +238,7 @@ export default function FileUpload({ onUploaded }) {
       {statusMessage && <p className="text-success">{statusMessage}</p>}
 
       <button type="submit" className="btn btn-primary" disabled={isSubmitting || !csvFile}>
-        {isSubmitting ? 'Parsing...' : 'Upload'}
+        {isSubmitting ? 'Processing...' : 'Upload'}
       </button>
 
       {parsedRows.length > 0 && (
