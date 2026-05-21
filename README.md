@@ -57,3 +57,5 @@ Lambda
  ├── Create destination path
  ├── Copy S3 object
  └── Return UUID + new S3 path
+
+ Now , i want to add functionality of searching those stored document using concept of GSI overloading , i have created index name searchPK-index for searching and made changes in my upload lambda function and search lambda function but i am unable to see the result in my frontend and its shows failed to search please fix there error . We are using GSI overloading because I have one table and many documentype where metadata are according to type of document so using these concept . 
