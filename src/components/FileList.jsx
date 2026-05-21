@@ -83,11 +83,11 @@ export default function FileList({
           {files.map((file) => (
 
             <tr
-              key={file.uuid}
+              key={file.uuid || file.DocumentId}
               className="table-row"
             >
 
-              <td>{file.uuid}</td>
+              <td className="cell-mono">{file.uuid || file.DocumentId}</td>
 
               <td>
                 {file.DocumentType}

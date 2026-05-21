@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { saveFile } from '../utils/files'
 import { getSession } from '../utils/auth'
 
+import { UPLOAD_LAMBDA_URL } from '../config/api.js'
+
+// UPLOAD_LAMBDA_URL uses /api/upload proxy in dev (see vite.config.js)
+
 const METADATA_KEY = 'ecm_metadata'
-const LAMBDA_COPY_URL =
-  'https://trloz5caellu5a4odhzeyesl3y0zwxet.lambda-url.us-east-1.on.aws/'
 
 async function callCopyLambda(rows) {
-  const response = await fetch(LAMBDA_COPY_URL, {
+  const response = await fetch(UPLOAD_LAMBDA_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rows }),

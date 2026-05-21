@@ -33,10 +33,6 @@
 // }
 const FILTERS = [
   {
-    value: 'all',
-    label: 'All Fields'
-  },
-  {
     value: 'DocumentType',
     label: 'Document Type'
   },
