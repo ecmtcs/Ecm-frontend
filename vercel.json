@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/upload",
+      "destination": "https://trloz5caellu5a4odhzeyesl3y0zwxet.lambda-url.us-east-1.on.aws/"
+    },
+    {
+      "source": "/api/search",
+      "destination": "https://sdnh3b56ojmfasqplglv6w2ddy0ozvce.lambda-url.us-east-1.on.aws/"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

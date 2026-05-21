@@ -85,7 +85,9 @@ export default function Home() {
 
               <p className="text-muted search-api-hint">
                 Search API: {SEARCH_LAMBDA_URL}
-                {import.meta.env.DEV && ' (proxied to Lambda)'}
+                {' '}
+      
+                (via /api/search proxy)
               </p>
 
               {error && <p className="text-danger">{error}</p>}

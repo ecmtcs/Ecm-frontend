@@ -15,7 +15,10 @@ function resolveUrl(envValue, fallback) {
   return value
 }
 
-export const UPLOAD_LAMBDA_URL = import.meta.env.DEV
+// Same-origin /api/upload: Vite proxy (dev) or vercel.json rewrites (prod). Avoids browser CORS to Lambda.
+const useProxy = import.meta.env.VITE_USE_LAMBDA_PROXY !== 'false'
+
+export const UPLOAD_LAMBDA_URL = useProxy
   ? '/api/upload'
   : resolveUrl(import.meta.env.VITE_UPLOAD_LAMBDA_URL, UPLOAD_URL)
 

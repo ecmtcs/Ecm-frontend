@@ -6,7 +6,10 @@
 const SEARCH_LAMBDA_DIRECT =
   'https://sdnh3b56ojmfasqplglv6w2ddy0ozvce.lambda-url.us-east-1.on.aws/'
 
-export const SEARCH_LAMBDA_URL = import.meta.env.DEV
+// Same-origin /api/search: Vite proxy (dev) or vercel.json rewrites (prod).
+const useProxy = import.meta.env.VITE_USE_LAMBDA_PROXY !== 'false'
+
+export const SEARCH_LAMBDA_URL = useProxy
   ? '/api/search'
   : SEARCH_LAMBDA_DIRECT
 
