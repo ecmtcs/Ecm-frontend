@@ -558,7 +558,7 @@ export default function FileUpload({ onUploaded }) {
 
   return (
     <form className="upload-card fade-in" onSubmit={handleSubmit}>
-      <h3>Upload asset</h3>
+      <h3>Bulk Upload</h3>
       <p className="text-muted">
         CSV is parsed, then sent to AWS Lambda to copy files into Archival and save metadata to DynamoDB.
       </p>

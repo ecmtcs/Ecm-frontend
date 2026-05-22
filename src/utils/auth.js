@@ -38,7 +38,7 @@ export function initializeDemoUser() {
   const users = getUsers()
   if (users.length === 0) {
     saveUser({
-      name: 'Demo User',
+      name: 'Logged-in User',
       email: 'demo@example.com',
       password: 'demo123'
     })

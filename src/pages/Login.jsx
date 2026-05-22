@@ -24,7 +24,7 @@ export default function Login() {
     <div className="auth-page">
       <div className="auth-card slide-up">
         <div className="auth-header">
-          <span className="brand-icon lg">ECM</span>
+          <span className="brand-icon lg">Framework By TCS ECM Practice</span>
           <h1>Welcome back</h1>
           <p className="text-muted">Sign in to your enterprise content workspace</p>
         </div>

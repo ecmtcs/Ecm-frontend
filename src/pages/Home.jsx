@@ -83,12 +83,12 @@ export default function Home() {
                 loading={loading}
               />
 
-              <p className="text-muted search-api-hint">
+              {/* <p className="text-muted search-api-hint">
                 Search API: {SEARCH_LAMBDA_URL}
                 {' '}
       
                 (via /api/search proxy)
-              </p>
+              </p> */}
 
               {error && <p className="text-danger">{error}</p>}
 

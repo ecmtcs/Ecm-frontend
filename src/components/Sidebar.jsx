@@ -21,8 +21,8 @@ export default function Sidebar({ collapsed, onToggle }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <span className="brand-icon">ECM</span>
-        <span className="brand-text">Content Hub</span>
+        <span className="brand-icon">TCS ECM</span>
+        <span className="brand-text">Gu Gu AI</span>
       </div>
 
       <nav className="sidebar-nav">
