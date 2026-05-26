@@ -88,12 +88,47 @@ a:hover {
 
 .auth-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 2.5rem;
+  padding: 2.75rem 2.5rem 2.5rem;
   box-shadow: var(--shadow);
+}
+
+.app-logo.auth-card-logo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 1.25rem;
+}
+
+.auth-card-logo .app-logo__img {
+  height: 44px;
+  max-height: 44px;
+  width: auto;
+  margin: 0 auto;
+}
+
+.app-logo {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+  text-decoration: none;
+}
+
+.app-logo__img {
+  display: block;
+  height: 32px;
+  max-height: 32px;
+  width: auto;
+  object-fit: contain;
+}
+
+.app-logo--nav .app-logo__img {
+  height: 28px;
+  max-height: 28px;
 }
 
 .auth-header {
@@ -296,14 +331,21 @@ a:hover {
 }
 
 .top-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 0 2rem;
+  padding: 0 1.5rem 0 2rem;
+  min-height: 56px;
 }
 
 .navbar-tabs {
   display: flex;
   gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .navbar-tabs .tab {
