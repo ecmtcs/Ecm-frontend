@@ -16,6 +16,13 @@ export default function Navbar({ activeTab, onTabChange }) {
         >
           Search
         </button>
+         <button
+          type="button"
+          className={activeTab === 'ai-search' ? 'tab active' : 'tab'}
+          onClick={() => onTabChange('ai-search')}
+        >
+          AI Search
+        </button>
       </div>
     </nav>
   )

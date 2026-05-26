@@ -1,0 +1,14 @@
+User Types Query
+↓
+React Frontend
+↓
+Lambda Function URL
+↓
+Search Lambda
+↓
+Bedrock Embedding
+↓
+OpenSearch Vector Search
+↓
+Matching Documents Returned
+
