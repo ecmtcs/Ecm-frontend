@@ -170,17 +170,18 @@ def sanitize_document_type_folder(document_type: str) -> str:
         raise ValueError("DocumentType is invalid")
 
     return name
-
-
+    
 def build_destination_key(source_key: str, file_uuid: str, document_type: str) -> str:
-    """
-    Archival layout: Archival/<DocumentType>/<uuid>/<filename>
-    S3 creates folder prefixes automatically when objects are copied.
-    """
     filename = os.path.basename(source_key) or "file"
     prefix = ARCHIVAL_PREFIX.rstrip("/")
     type_folder = sanitize_document_type_folder(document_type)
-    return f"{prefix}/{type_folder}/{file_uuid}/{filename}"
+
+    name, ext = os.path.splitext(filename)
+    safe_filename = f"{name}_{file_uuid}{ext}"
+
+    return f"{prefix}/{type_folder}/{safe_filename}"
+
+
 
 
 def build_s3_url(bucket: str, key: str) -> str:
@@ -212,12 +213,58 @@ def _string_value(value: Any) -> str | None:
     return text if text else None
 
 
+# GSI overloading: SearchPK-index partition key SearchPK = PREFIX#value
+_SEARCH_GSI_FIELDS = (
+    ("DocumentType", "DOCTYPE"),
+    ("AccountNumber", "ACCOUNTNUMBER"),
+    ("AccountHolderName", "ACCOUNTHOLDERNAME"),
+    ("Branch", "BRANCH"),
+)
+
+
+def _enrich_gsi_search_keys(item: dict) -> dict:
+    """
+    True GSI overloading.
+
+    Priority:
+      1. DocumentType
+      2. AccountNumber
+      3. AccountHolderName
+      4. Branch
+
+    Only ONE SearchPK is stored per item.
+    """
+
+    if item.get("DocumentType"):
+        item["SearchPK"] = (
+            f"DOCTYPE#{str(item['DocumentType']).strip().lower()}"
+        )
+
+    elif item.get("AccountNumber"):
+        item["SearchPK"] = (
+            f"ACCOUNTNUMBER#{str(item['AccountNumber']).strip().lower()}"
+        )
+
+    elif item.get("AccountHolderName"):
+        item["SearchPK"] = (
+            f"ACCOUNTHOLDERNAME#{str(item['AccountHolderName']).strip().lower()}"
+        )
+
+    elif item.get("Branch"):
+        item["SearchPK"] = (
+            f"BRANCH#{str(item['Branch']).strip().lower()}"
+        )
+
+    return item
+
+
 def build_dynamodb_item(row: dict, document_id: str, destination_url: str) -> dict:
     """
     Build DocumentMetadata item:
       - DocumentId (partition key) = uuid
       - FilePath = destination S3 URL (not the CSV source path)
       - All other CSV columns except source FilePath
+      - SearchPK for GSI search (SearchPK-index)
     """
     item: dict[str, str] = {
         "DocumentId": document_id,
@@ -238,13 +285,63 @@ def build_dynamodb_item(row: dict, document_id: str, destination_url: str) -> di
 
         item[key] = text
 
-    return item
+    return _enrich_gsi_search_keys(item)
 
 
-def save_metadata_to_dynamodb(row: dict, document_id: str, destination_url: str) -> dict:
-    item = build_dynamodb_item(row, document_id, destination_url)
-    metadata_table.put_item(Item=item)
-    return item
+
+def save_metadata_to_dynamodb(
+    row: dict,
+    document_id: str,
+    destination_url: str
+):
+
+    main_item = build_dynamodb_item(
+        row,
+        document_id,
+        destination_url
+    )
+
+    # MAIN DOCUMENT ITEM
+    metadata_table.put_item(
+        Item=main_item
+    )
+
+    searchable_fields = [
+        ("AccountNumber", "ACCOUNTNUMBER"),
+        ("AccountHolderName", "ACCOUNTHOLDERNAME"),
+        ("Branch", "BRANCH"),
+    ]
+
+    for field, prefix in searchable_fields:
+
+        value = row.get(field)
+
+        if not value:
+            continue
+
+        normalized = (
+            str(value)
+            .strip()
+            .lower()
+        )
+
+        search_item = {
+
+            "DocumentId":
+                f"SEARCH#{document_id}#{prefix}",
+
+            "ReferenceDocumentId":
+                document_id,
+
+            "SearchPK":
+                f"{prefix}#{normalized}"
+        }
+
+        metadata_table.put_item(
+            Item=search_item
+        )
+
+    return main_item
 
 
 def process_row(row: dict, index: int) -> dict:

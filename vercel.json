@@ -9,6 +9,10 @@
       "destination": "https://sdnh3b56ojmfasqplglv6w2ddy0ozvce.lambda-url.us-east-1.on.aws/"
     },
     {
+      "source": "/api/ai-search",
+      "destination": "https://ypq6aalk4lulj23yfgxd34vx3q0ohqhp.lambda-url.us-east-1.on.aws/"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

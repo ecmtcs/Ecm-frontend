@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Any
 
 import boto3
-from boto3.dynamodb.conditions import Attr
+from boto3.dynamodb.conditions import Key
 
 AWS_REGION = os.environ.get(
     "AWS_REGION",
@@ -103,12 +103,11 @@ def _normalize_item(item: dict):
 
     return normalized
 
-
 def search_documents(query, filter_key):
 
     query = (
         query or ""
-    ).strip()
+    ).strip().lower()
 
     filter_key = (
         filter_key or ""
@@ -119,17 +118,22 @@ def search_documents(query, filter_key):
     )
 
     if not prefix:
-
         return []
 
     overloaded_key = (
         f"{prefix}#{query}"
     )
 
-    response = metadata_table.scan(
-        FilterExpression=Attr(
+    response = metadata_table.query(
+        IndexName="SearchPK-index",
+
+        KeyConditionExpression=Key(
             "SearchPK"
-        ).contains(overloaded_key)
+        ).eq(
+            overloaded_key
+        ),
+
+        Limit=MAX_RESULTS
     )
 
     items = response.get(
@@ -137,17 +141,75 @@ def search_documents(query, filter_key):
         []
     )
 
-    return [
-        _normalize_item(item)
-        for item in items
-    ][:MAX_RESULTS]
+    results = []
 
+    for item in items:
+
+        # MAIN ITEM
+        if "ReferenceDocumentId" not in item:
+
+            results.append(
+                _normalize_item(item)
+            )
+
+            continue
+
+        # SEARCH ITEM
+        document_id = item.get(
+            "ReferenceDocumentId"
+        )
+
+        if not document_id:
+            continue
+
+        document_response = metadata_table.get_item(
+            Key={
+                "DocumentId": document_id
+            }
+        )
+
+        document = document_response.get(
+            "Item"
+        )
+
+        if document:
+
+            results.append(
+                _normalize_item(document)
+            )
+
+    return results
 
 def lambda_handler(event, context):
 
+    request_context = event.get(
+        "requestContext"
+    ) or {}
+
+    if (
+        request_context.get(
+            "http",
+            {}
+        ).get(
+            "method"
+        ) == "OPTIONS"
+        or event.get(
+            "httpMethod"
+        ) == "OPTIONS"
+    ):
+
+        return _response(
+            200,
+            {
+                "message": "OK"
+            }
+        )
+
     try:
 
-        payload = _parse_event_body(event)
+        payload = _parse_event_body(
+            event
+        )
 
         query = payload.get(
             "query",

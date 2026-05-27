@@ -5,6 +5,8 @@ const SEARCH_LAMBDA_TARGET =
   'https://sdnh3b56ojmfasqplglv6w2ddy0ozvce.lambda-url.us-east-1.on.aws'
 const UPLOAD_LAMBDA_TARGET =
   'https://trloz5caellu5a4odhzeyesl3y0zwxet.lambda-url.us-east-1.on.aws'
+const AI_SEARCH_LAMBDA_TARGET =
+  'https://ypq6aalk4lulj23yfgxd34vx3q0ohqhp.lambda-url.us-east-1.on.aws'
 
 export default defineConfig({
   plugins: [react()],
@@ -24,6 +26,12 @@ export default defineConfig({
       },
       '/api/upload': {
         target: UPLOAD_LAMBDA_TARGET,
+        changeOrigin: true,
+        secure: false,
+        rewrite: () => '/',
+      },
+      '/api/ai-search': {
+        target: AI_SEARCH_LAMBDA_TARGET,
         changeOrigin: true,
         secure: false,
         rewrite: () => '/',
