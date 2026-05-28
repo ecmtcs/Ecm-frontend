@@ -15,11 +15,12 @@ Expected request body (from frontend):
   }
 
 Per row:
-  1. Copy source object to Archival/<DocumentType>/<uuid>/<filename>
+  1. Copy source object to Archival/<DocumentType>/<uuid>.<ext> (UUID-only object name)
   2. PutItem into DocumentMetadata (partition key DocumentId = uuid)
      - All CSV columns except source FilePath
      - FilePath attribute = destination S3 URL (replaces source path)
      - DocumentId = generated uuid
+     - System metadata: DocumentTitle, Creator, CreatedDate, Size, MimeType
 
 Response (JSON array, one item per row):
   [
@@ -27,7 +28,7 @@ Response (JSON array, one item per row):
       "documentId": "...",
       "uuid": "...",
       "sourceKey": "Staging/file.pdf",
-      "destinationKey": "Archival/<DocumentType>/<uuid>/file.pdf",
+      "destinationKey": "Archival/<DocumentType>/<uuid>.pdf",
       "newS3Path": "https://.../Archival/...",
       "documentType": "Contract",
       "status": "copied",
@@ -47,6 +48,7 @@ import os
 import re
 import uuid
 import urllib.parse
+from datetime import datetime, timezone
 from typing import Any
 
 import boto3
@@ -172,14 +174,57 @@ def sanitize_document_type_folder(document_type: str) -> str:
     return name
     
 def build_destination_key(source_key: str, file_uuid: str, document_type: str) -> str:
+    """
+    Archival object key uses only the document UUID (plus extension for content handling).
+    Original filename is stored in DynamoDB as DocumentTitle.
+    """
     filename = os.path.basename(source_key) or "file"
     prefix = ARCHIVAL_PREFIX.rstrip("/")
     type_folder = sanitize_document_type_folder(document_type)
 
-    name, ext = os.path.splitext(filename)
-    safe_filename = f"{name}_{file_uuid}{ext}"
+    _, ext = os.path.splitext(filename)
+    archival_name = f"{file_uuid}{ext}" if ext else file_uuid
 
-    return f"{prefix}/{type_folder}/{safe_filename}"
+    return f"{prefix}/{type_folder}/{archival_name}"
+
+
+def get_source_object_metadata(source_bucket: str, source_key: str) -> dict[str, Any]:
+    """Read size and Content-Type from the source S3 object before copy."""
+    try:
+        response = s3.head_object(Bucket=source_bucket, Key=source_key)
+        content_type = response.get("ContentType") or "application/octet-stream"
+        size = response.get("ContentLength")
+        return {
+            "size": int(size) if size is not None else None,
+            "mime_type": str(content_type).strip() or "application/octet-stream",
+        }
+    except ClientError:
+        return {"size": None, "mime_type": None}
+
+
+def extract_document_title(source_key: str) -> str:
+    return os.path.basename(source_key) or "file"
+
+
+def resolve_creator(row: dict) -> str:
+    creator = _string_value(row.get("Creator")) or _string_value(row.get("creator"))
+    if creator:
+        return creator
+
+    name = _string_value(row.get("CreatorName")) or _string_value(row.get("creatorName"))
+    email = _string_value(row.get("CreatorEmail")) or _string_value(row.get("creatorEmail"))
+    if name and email:
+        return f"{name} ({email})"
+    if name:
+        return name
+    if email:
+        return email
+
+    return "Unknown"
+
+
+def utc_created_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 
@@ -258,29 +303,62 @@ def _enrich_gsi_search_keys(item: dict) -> dict:
     return item
 
 
-def build_dynamodb_item(row: dict, document_id: str, destination_url: str) -> dict:
+_RESERVED_ROW_KEYS = {
+    "documentid",
+    "document id",
+    "creator",
+    "creatorname",
+    "creatoremail",
+    "documenttitle",
+    "createddate",
+    "size",
+    "mimetype",
+}
+
+
+def build_dynamodb_item(
+    row: dict,
+    document_id: str,
+    destination_url: str,
+    *,
+    document_title: str,
+    creator: str,
+    created_date: str,
+    size_bytes: int | None,
+    mime_type: str | None,
+) -> dict:
     """
     Build DocumentMetadata item:
       - DocumentId (partition key) = uuid
       - FilePath = destination S3 URL (not the CSV source path)
-      - All other CSV columns except source FilePath
+      - System properties: DocumentTitle, Creator, CreatedDate, Size, MimeType
+      - All other CSV columns except source FilePath and reserved system keys
       - SearchPK for GSI search (SearchPK-index)
     """
-    item: dict[str, str] = {
+    item: dict[str, Any] = {
         "DocumentId": document_id,
         "FilePath": destination_url,
+        "DocumentTitle": document_title,
+        "Creator": creator,
+        "CreatedDate": created_date,
     }
+
+    if size_bytes is not None:
+        item["Size"] = size_bytes
+
+    if mime_type:
+        item["MimeType"] = mime_type
 
     for key, value in row.items():
         if _is_file_path_column(key):
             continue
 
-        text = _string_value(value)
-        if text is None:
+        normalized = _normalize_header(key).replace(" ", "")
+        if normalized in _RESERVED_ROW_KEYS:
             continue
 
-        # Do not overwrite partition key or destination path
-        if _normalize_header(key) in {"documentid", "document id"}:
+        text = _string_value(value)
+        if text is None:
             continue
 
         item[key] = text
@@ -292,13 +370,24 @@ def build_dynamodb_item(row: dict, document_id: str, destination_url: str) -> di
 def save_metadata_to_dynamodb(
     row: dict,
     document_id: str,
-    destination_url: str
+    destination_url: str,
+    *,
+    document_title: str,
+    creator: str,
+    created_date: str,
+    size_bytes: int | None,
+    mime_type: str | None,
 ):
 
     main_item = build_dynamodb_item(
         row,
         document_id,
-        destination_url
+        destination_url,
+        document_title=document_title,
+        creator=creator,
+        created_date=created_date,
+        size_bytes=size_bytes,
+        mime_type=mime_type,
     )
 
     # MAIN DOCUMENT ITEM
@@ -371,12 +460,26 @@ def process_row(row: dict, index: int) -> dict:
         type_folder = sanitize_document_type_folder(document_type)
         dest_key = build_destination_key(source_key, file_uuid, document_type)
 
+        object_metadata = get_source_object_metadata(source_bucket, source_key)
+        document_title = extract_document_title(source_key)
+        creator = resolve_creator(row)
+        created_date = utc_created_timestamp()
+
         copy_object(source_bucket, source_key, dest_bucket, dest_key)
 
         new_s3_path = build_s3_url(dest_bucket, dest_key)
 
         try:
-            dynamo_item = save_metadata_to_dynamodb(row, file_uuid, new_s3_path)
+            dynamo_item = save_metadata_to_dynamodb(
+                row,
+                file_uuid,
+                new_s3_path,
+                document_title=document_title,
+                creator=creator,
+                created_date=created_date,
+                size_bytes=object_metadata.get("size"),
+                mime_type=object_metadata.get("mime_type"),
+            )
         except ClientError as exc:
             code = exc.response.get("Error", {}).get("Code", "ClientError")
             message = exc.response.get("Error", {}).get("Message", str(exc))
@@ -403,6 +506,11 @@ def process_row(row: dict, index: int) -> dict:
             "destinationBucket": dest_bucket,
             "documentType": document_type,
             "documentTypeFolder": type_folder,
+            "documentTitle": document_title,
+            "creator": creator,
+            "createdDate": created_date,
+            "size": object_metadata.get("size"),
+            "mimeType": object_metadata.get("mime_type"),
             "newS3Path": new_s3_path,
             "metadataSaved": True,
             "dynamoItem": dynamo_item,
