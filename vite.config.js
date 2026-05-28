@@ -7,6 +7,10 @@ const UPLOAD_LAMBDA_TARGET =
   'https://trloz5caellu5a4odhzeyesl3y0zwxet.lambda-url.us-east-1.on.aws'
 const AI_SEARCH_LAMBDA_TARGET =
   'https://ypq6aalk4lulj23yfgxd34vx3q0ohqhp.lambda-url.us-east-1.on.aws'
+// Set after deploying document-preview-lambda (Function URL)
+const DOCUMENT_PREVIEW_LAMBDA_TARGET =
+  process.env.VITE_DOCUMENT_PREVIEW_LAMBDA_URL ||
+  'https://43htd6x7vtya4cqd447tt4qpfq0pbjwk.lambda-url.us-east-1.on.aws/'
 
 export default defineConfig({
   plugins: [react()],
@@ -32,6 +36,12 @@ export default defineConfig({
       },
       '/api/ai-search': {
         target: AI_SEARCH_LAMBDA_TARGET,
+        changeOrigin: true,
+        secure: false,
+        rewrite: () => '/',
+      },
+      '/api/document': {
+        target: DOCUMENT_PREVIEW_LAMBDA_TARGET,
         changeOrigin: true,
         secure: false,
         rewrite: () => '/',

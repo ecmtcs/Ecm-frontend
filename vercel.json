@@ -13,6 +13,10 @@
       "destination": "https://ypq6aalk4lulj23yfgxd34vx3q0ohqhp.lambda-url.us-east-1.on.aws/"
     },
     {
+      "source": "/api/document",
+      "destination": "https://43htd6x7vtya4cqd447tt4qpfq0pbjwk.lambda-url.us-east-1.on.aws/"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

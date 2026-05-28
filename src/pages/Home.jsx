@@ -17,7 +17,6 @@ export default function Home() {
   const [resultCount, setResultCount] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
   async function handleSearch() {
     const trimmed = query.trim()
     if (!trimmed) {
