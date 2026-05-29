@@ -77,33 +77,6 @@ def _normalize_item(item: dict) -> dict:
     return normalized
 
 
-def _guess_mime_from_key(key: str) -> str:
-  ext = key.rsplit(".", 1)[-1].lower() if "." in key else ""
-  mime_map = {
-      "pdf": "application/pdf",
-      "jpg": "image/jpeg",
-      "jpeg": "image/jpeg",
-      "png": "image/png",
-      "gif": "image/gif",
-      "bmp": "image/bmp",
-      "webp": "image/webp",
-      "svg": "image/svg+xml",
-      "tif": "image/tiff",
-      "tiff": "image/tiff",
-      "txt": "text/plain",
-      "csv": "text/csv",
-      "json": "application/json",
-      "xml": "text/xml",
-      "html": "text/html",
-      "htm": "text/html",
-      "mp4": "video/mp4",
-      "webm": "video/webm",
-      "mp3": "audio/mpeg",
-      "wav": "audio/wav",
-  }
-  return mime_map.get(ext, "application/octet-stream")
-
-
 def _parse_s3_location(file_path: str) -> tuple[str, str]:
     """Parse S3 bucket and key from https URL, s3:// URI, or key-only path."""
     file_path = (file_path or "").strip()
@@ -141,37 +114,6 @@ def _parse_s3_location(file_path: str) -> tuple[str, str]:
     return DEFAULT_BUCKET, file_path.lstrip("/")
 
 
-SYSTEM_METADATA_KEYS = frozenset({
-    "DocumentId",
-    "DocumentTitle",
-    "Creator",
-    "CreatedDate",
-    "MimeType",
-    "Size",
-    "FilePath",
-})
-
-INTERNAL_METADATA_KEYS = frozenset({
-    "SearchPK",
-    "ReferenceDocumentId",
-})
-
-
-def _split_metadata(metadata: dict) -> tuple[dict, dict]:
-    system: dict[str, Any] = {}
-    document: dict[str, Any] = {}
-
-    for key, value in metadata.items():
-        if key in INTERNAL_METADATA_KEYS:
-            continue
-        if key in SYSTEM_METADATA_KEYS:
-            system[key] = value
-        else:
-            document[key] = value
-
-    return system, document
-
-
 def get_document_preview(document_id: str) -> dict:
     document_id = (document_id or "").strip()
     if not document_id:
@@ -198,10 +140,7 @@ def get_document_preview(document_id: str) -> dict:
         raise ValueError("Document has no FilePath")
 
     bucket, key = _parse_s3_location(file_path)
-    mime_type = metadata.get("MimeType") or metadata.get("mimeType") or ""
-
-    if not mime_type:
-        mime_type = _guess_mime_from_key(key)
+    mime_type = metadata.get("MimeType") or metadata.get("mimeType") or "application/pdf"
 
     try:
         preview_url = s3.generate_presigned_url(
@@ -212,15 +151,11 @@ def get_document_preview(document_id: str) -> dict:
     except ClientError as exc:
         raise ValueError(f"Could not generate preview URL: {exc}") from exc
 
-    system_metadata, document_metadata = _split_metadata(metadata)
-
     return {
         "documentId": document_id,
         "previewUrl": preview_url,
         "mimeType": mime_type,
         "metadata": metadata,
-        "systemMetadata": system_metadata,
-        "documentMetadata": document_metadata,
     }
 
 
