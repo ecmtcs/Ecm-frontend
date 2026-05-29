@@ -77,6 +77,33 @@ def _normalize_item(item: dict) -> dict:
     return normalized
 
 
+def _guess_mime_from_key(key: str) -> str:
+  ext = key.rsplit(".", 1)[-1].lower() if "." in key else ""
+  mime_map = {
+      "pdf": "application/pdf",
+      "jpg": "image/jpeg",
+      "jpeg": "image/jpeg",
+      "png": "image/png",
+      "gif": "image/gif",
+      "bmp": "image/bmp",
+      "webp": "image/webp",
+      "svg": "image/svg+xml",
+      "tif": "image/tiff",
+      "tiff": "image/tiff",
+      "txt": "text/plain",
+      "csv": "text/csv",
+      "json": "application/json",
+      "xml": "text/xml",
+      "html": "text/html",
+      "htm": "text/html",
+      "mp4": "video/mp4",
+      "webm": "video/webm",
+      "mp3": "audio/mpeg",
+      "wav": "audio/wav",
+  }
+  return mime_map.get(ext, "application/octet-stream")
+
+
 def _parse_s3_location(file_path: str) -> tuple[str, str]:
     """Parse S3 bucket and key from https URL, s3:// URI, or key-only path."""
     file_path = (file_path or "").strip()
@@ -171,7 +198,10 @@ def get_document_preview(document_id: str) -> dict:
         raise ValueError("Document has no FilePath")
 
     bucket, key = _parse_s3_location(file_path)
-    mime_type = metadata.get("MimeType") or metadata.get("mimeType") or "application/pdf"
+    mime_type = metadata.get("MimeType") or metadata.get("mimeType") or ""
+
+    if not mime_type:
+        mime_type = _guess_mime_from_key(key)
 
     try:
         preview_url = s3.generate_presigned_url(

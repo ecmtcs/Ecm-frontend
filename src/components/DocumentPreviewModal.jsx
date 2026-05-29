@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { fetchDocumentPreview } from '../utils/documentApi'
 import {
   getDocumentTitle,
-  isPdfMimeType,
   splitDocumentMetadata,
 } from '../utils/documentMetadata'
+import DocumentPreviewContent from './DocumentPreviewContent'
 import MetadataSection from './MetadataSection'
 import './DocumentPreviewModal.css'
 
@@ -13,7 +13,8 @@ export default function DocumentPreviewModal({ documentId, onClose }) {
   const [error, setError] = useState('')
   const [title, setTitle] = useState('Document preview')
   const [previewUrl, setPreviewUrl] = useState('')
-  const [mimeType, setMimeType] = useState('application/pdf')
+  const [mimeType, setMimeType] = useState('')
+  const [filePath, setFilePath] = useState('')
   const [systemEntries, setSystemEntries] = useState([])
   const [documentEntries, setDocumentEntries] = useState([])
 
@@ -30,11 +31,14 @@ export default function DocumentPreviewModal({ documentId, onClose }) {
         documentMetadata: data.documentMetadata ?? undefined,
       })
 
+      const metadata = data.metadata ?? {}
+
       setPreviewUrl(data.previewUrl)
-      setMimeType(data.mimeType)
+      setMimeType(data.mimeType ?? metadata.MimeType ?? '')
+      setFilePath(metadata.FilePath ?? metadata.filePath ?? '')
       setSystemEntries(system)
       setDocumentEntries(document)
-      setTitle(getDocumentTitle(data.metadata))
+      setTitle(getDocumentTitle(metadata))
     } catch (err) {
       setError(err.message || 'Failed to load document.')
       setSystemEntries([])
@@ -66,8 +70,6 @@ export default function DocumentPreviewModal({ documentId, onClose }) {
   }, [documentId, onClose])
 
   if (!documentId) return null
-
-  const showPdf = previewUrl && isPdfMimeType(mimeType)
 
   return (
     <div
@@ -110,22 +112,13 @@ export default function DocumentPreviewModal({ documentId, onClose }) {
                 </div>
               )}
 
-              {!loading && showPdf && (
-                <iframe src={previewUrl} title={title} className="doc-preview-iframe" />
-              )}
-
-              {!loading && previewUrl && !showPdf && (
-                <div className="doc-preview-fallback">
-                  <p className="text-muted">Inline preview is not available for this file type.</p>
-                  <a
-                    href={previewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-primary"
-                  >
-                    Open / download file
-                  </a>
-                </div>
+              {!loading && previewUrl && (
+                <DocumentPreviewContent
+                  url={previewUrl}
+                  title={title}
+                  mimeType={mimeType}
+                  filePath={filePath}
+                />
               )}
             </section>
 
@@ -134,19 +127,16 @@ export default function DocumentPreviewModal({ documentId, onClose }) {
                 <p className="text-muted">Loading metadata…</p>
               ) : (
                 <>
-                <MetadataSection
-                    title="Document metadata"
-                    entries={documentEntries}
-                    emptyMessage="No additional document metadata."
-                    defaultOpen
-                  /> 
                   <MetadataSection
                     title="System metadata"
                     entries={systemEntries}
                     emptyMessage="No system metadata available."
-                    defaultOpen
                   />
-                  
+                  <MetadataSection
+                    title="Document metadata"
+                    entries={documentEntries}
+                    emptyMessage="No additional document metadata."
+                  />
                 </>
               )}
             </aside>
