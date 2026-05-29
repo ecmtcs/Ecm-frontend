@@ -17,6 +17,7 @@ export default function Home() {
   const [resultCount, setResultCount] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
   async function handleSearch() {
     const trimmed = query.trim()
     if (!trimmed) {
@@ -85,7 +86,7 @@ export default function Home() {
           )}
 
           {activeTab === 'search' && (
-            <section className="tab-panel fade-in">
+            <section className="tab-panel tab-panel--search fade-in">
               <FileSearch
                 query={query}
                 filter={filter}
@@ -95,22 +96,17 @@ export default function Home() {
                 loading={loading}
               />
 
-              {/* <p className="text-muted search-api-hint">
-                Search API: {SEARCH_LAMBDA_URL}
-                {' '}
-      
-                (via /api/search proxy)
-              </p> */}
-
               {error && <p className="text-danger">{error}</p>}
 
-              {resultCount !== null && !error && (
-                <p className="search-result-count text-muted">
-                  {resultCount} document{resultCount === 1 ? '' : 's'} found
-                </p>
-              )}
+              <div className="search-results-region">
+                {resultCount !== null && !error && (
+                  <p className="search-result-count text-muted">
+                    {resultCount} document{resultCount === 1 ? '' : 's'} found
+                  </p>
+                )}
 
-              <FileList files={files} />
+                <FileList files={files} />
+              </div>
             </section>
           )}
 

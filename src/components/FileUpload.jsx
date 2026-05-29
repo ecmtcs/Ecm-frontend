@@ -423,13 +423,32 @@ function saveMetadata(items) {
   }
 }
 
-function buildMetadata(row, fileKey, owner, lambdaResult) {
+function formatCreator(session) {
+  if (!session) return 'Unknown'
+  const { name, email } = session
+  if (name && email) return `${name} (${email})`
+  return name || email || 'Unknown'
+}
+
+function buildMetadata(row, fileKey, creator, lambdaResult) {
+  const dynamoItem = lambdaResult?.dynamoItem || {}
+  const sourceFileName =
+    row[fileKey] ||
+    lambdaResult?.documentTitle ||
+    dynamoItem.DocumentTitle ||
+    ''
+
   return {
-    owner,
+    owner: creator,
     fileUrl: lambdaResult?.newS3Path || '',
     uuid: lambdaResult?.uuid || '',
-    uploadedAt: new Date().toISOString(),
-    fileName: row[fileKey] || '',
+    uploadedAt: dynamoItem.CreatedDate || lambdaResult?.createdDate || new Date().toISOString(),
+    fileName: sourceFileName,
+    documentTitle: dynamoItem.DocumentTitle || lambdaResult?.documentTitle || sourceFileName,
+    creator: dynamoItem.Creator || lambdaResult?.creator || creator,
+    createdDate: dynamoItem.CreatedDate || lambdaResult?.createdDate || '',
+    size: dynamoItem.Size ?? lambdaResult?.size ?? null,
+    mimeType: dynamoItem.MimeType || lambdaResult?.mimeType || '',
     metadata: Object.entries(row).reduce((acc, [key, value]) => {
       if (key === fileKey) return acc
       if (value != null && `${value}`.trim() !== '') {
@@ -480,7 +499,7 @@ export default function FileUpload({ onUploaded }) {
 
     try {
       const session = getSession()
-      const owner = session?.name || 'Unknown'
+      const creator = formatCreator(session)
       const { headers, rows } = await parseCsvFile(csvFile)
 
       if (rows.length === 0) {
@@ -514,6 +533,9 @@ export default function FileUpload({ onUploaded }) {
         if (documentTypeKey !== 'DocumentType') {
           payload.DocumentType = row[documentTypeKey]
         }
+        payload.Creator = creator
+        if (session?.name) payload.CreatorName = session.name
+        if (session?.email) payload.CreatorEmail = session.email
         return payload
       })
 
@@ -528,12 +550,12 @@ export default function FileUpload({ onUploaded }) {
 
       const fileKey = getCsvFileKey(headers)
       const uploadMetadata = rows.map((row, index) =>
-        buildMetadata(row, fileKey, owner, lambdaResponse[index])
+        buildMetadata(row, fileKey, creator, lambdaResponse[index])
       )
 
       saveMetadata(uploadMetadata)
 
-      const savedRecord = saveFile({ name: csvFile.name, owner })
+      const savedRecord = saveFile({ name: csvFile.name, owner: creator })
       setCsvFile(null)
       setParsedRows([])
       setParsedHeaders([])

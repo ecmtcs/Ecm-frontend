@@ -376,6 +376,13 @@ a:hover {
   max-width: 900px;
 }
 
+.tab-panel--search {
+  max-width: none;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
 .sidebar-brand {
   padding: 0 1.25rem 1.5rem;
   border-bottom: 1px solid var(--border);
@@ -435,6 +442,10 @@ a:hover {
   flex: 1;
   padding: 2rem;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
 }
 
 .app-layout.sidebar-hidden .main-wrapper {
@@ -578,9 +589,18 @@ a:hover {
   white-space: nowrap;
 }
 
+.search-results-region {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
 .search-result-count {
-  padding: 0.75rem 1.25rem 0;
+  padding: 0.25rem 0 0.75rem;
   font-size: 0.85rem;
+  flex-shrink: 0;
 }
 
 .search-api-hint {
@@ -603,15 +623,60 @@ a:hover {
   overflow: hidden;
 }
 
+.file-table-wrap--search {
+  flex: 1;
+  width: 100%;
+  min-height: 240px;
+  max-height: calc(100vh - 300px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .file-table {
   width: 100%;
   border-collapse: collapse;
+}
+
+.file-table--search {
+  width: max-content;
+  min-width: 100%;
 }
 
 .file-table th,
 .file-table td {
   padding: 0.85rem 1.25rem;
   text-align: left;
+}
+
+.file-table--search th,
+.file-table--search td {
+  white-space: nowrap;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+
+.file-table--search th.col-actions,
+.file-table--search td.col-actions {
+  position: sticky;
+  right: 0;
+  max-width: none;
+  background: var(--surface);
+  box-shadow: -8px 0 12px rgba(0, 0, 0, 0.25);
+  z-index: 1;
+}
+
+.file-table--search thead th.col-actions {
+  background: var(--surface-elevated);
+  z-index: 2;
+}
+
+.file-table--search thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-elevated);
 }
 
 .file-table th {
@@ -621,6 +686,10 @@ a:hover {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
+}
+
+.empty-state--full {
+  width: 100%;
 }
 
 .table-row {

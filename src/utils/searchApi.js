@@ -37,10 +37,15 @@ export function normalizeSearchResult(item) {
     ...item,
     uuid: documentId,
     DocumentType: item.DocumentType ?? item.documentType ?? '',
+    DocumentTitle: item.DocumentTitle ?? item.documentTitle ?? '',
     AccountNumber: item.AccountNumber ?? item.accountNumber ?? '',
     AccountHolderName:
       item.AccountHolderName ?? item.accountHolderName ?? '',
     Branch: item.Branch ?? item.branch ?? '',
+    Creator: item.Creator ?? item.creator ?? '',
+    CreatedDate: item.CreatedDate ?? item.createdDate ?? '',
+    Size: item.Size ?? item.size ?? null,
+    MimeType: item.MimeType ?? item.mimeType ?? '',
     archivalFilePath: filePath,
   }
 }
