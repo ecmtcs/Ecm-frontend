@@ -203,8 +203,14 @@
   word-break: break-word;
 }
 
-.ai-search__score {
+.ai-search__card-actions {
+  display: flex;
   flex-shrink: 0;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.ai-search__score {
   padding: 0.25rem 0.6rem;
   background: rgba(59, 130, 246, 0.15);
   color: var(--primary, #3b82f6);

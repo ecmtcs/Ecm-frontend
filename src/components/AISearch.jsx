@@ -99,7 +99,7 @@ function formatScore(score) {
   return score.toFixed(2)
 }
 
-export default function AISearch() {
+export default function AISearch({ onView }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [resultCount, setResultCount] = useState(null)
@@ -222,9 +222,20 @@ export default function AISearch() {
             >
               <div className="ai-search__card-header">
                 <h3 className="ai-search__card-title">{item.fileName}</h3>
-                <span className="ai-search__score" title="Similarity score">
-                  {formatScore(item.score)}
-                </span>
+                <div className="ai-search__card-actions">
+                  <span className="ai-search__score" title="Similarity score">
+                    {formatScore(item.score)}
+                  </span>
+                  {item.documentId && item.documentId !== '—' && (
+                    <button
+                      type="button"
+                      className="btn-link btn-view"
+                      onClick={() => onView?.(item.documentId)}
+                    >
+                      View
+                    </button>
+                  )}
+                </div>
               </div>
               <dl className="ai-search__meta">
                 <div className="ai-search__meta-row">

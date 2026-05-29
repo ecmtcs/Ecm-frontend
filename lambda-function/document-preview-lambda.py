@@ -114,6 +114,37 @@ def _parse_s3_location(file_path: str) -> tuple[str, str]:
     return DEFAULT_BUCKET, file_path.lstrip("/")
 
 
+SYSTEM_METADATA_KEYS = frozenset({
+    "DocumentId",
+    "DocumentTitle",
+    "Creator",
+    "CreatedDate",
+    "MimeType",
+    "Size",
+    "FilePath",
+})
+
+INTERNAL_METADATA_KEYS = frozenset({
+    "SearchPK",
+    "ReferenceDocumentId",
+})
+
+
+def _split_metadata(metadata: dict) -> tuple[dict, dict]:
+    system: dict[str, Any] = {}
+    document: dict[str, Any] = {}
+
+    for key, value in metadata.items():
+        if key in INTERNAL_METADATA_KEYS:
+            continue
+        if key in SYSTEM_METADATA_KEYS:
+            system[key] = value
+        else:
+            document[key] = value
+
+    return system, document
+
+
 def get_document_preview(document_id: str) -> dict:
     document_id = (document_id or "").strip()
     if not document_id:
@@ -151,11 +182,15 @@ def get_document_preview(document_id: str) -> dict:
     except ClientError as exc:
         raise ValueError(f"Could not generate preview URL: {exc}") from exc
 
+    system_metadata, document_metadata = _split_metadata(metadata)
+
     return {
         "documentId": document_id,
         "previewUrl": preview_url,
         "mimeType": mime_type,
         "metadata": metadata,
+        "systemMetadata": system_metadata,
+        "documentMetadata": document_metadata,
     }
 
 

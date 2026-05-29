@@ -24,3 +24,4 @@ export const UPLOAD_LAMBDA_URL = useProxy
 
 // Search URL lives in src/utils/searchApi.js (hardcoded) to avoid stale env/cache issues.
 export { SEARCH_LAMBDA_URL } from '../utils/searchApi.js'
+export { DOCUMENT_PREVIEW_URL } from '../utils/documentApi.js'

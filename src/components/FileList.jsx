@@ -1,11 +1,14 @@
 import {
   formatSearchCellValue,
   formatSearchColumnLabel,
-  getDocumentViewUrl,
   getSearchDisplayColumns,
 } from '../utils/searchDisplay'
 
-export default function FileList({ files }) {
+function getDocumentId(file) {
+  return file?.uuid || file?.DocumentId || file?.documentId || ''
+}
+
+export default function FileList({ files, onView }) {
   if (!files.length) {
     return (
       <div className="empty-state empty-state--full fade-in">
@@ -30,8 +33,8 @@ export default function FileList({ files }) {
         </thead>
         <tbody>
           {files.map((file) => {
-            const rowKey = file.uuid || file.DocumentId || file.DocumentTitle
-            const viewUrl = getDocumentViewUrl(file)
+            const rowKey = getDocumentId(file) || file.DocumentTitle
+            const documentId = getDocumentId(file)
 
             return (
               <tr key={rowKey} className="table-row">
@@ -41,12 +44,16 @@ export default function FileList({ files }) {
                   </td>
                 ))}
                 <td className="col-actions">
-                  {viewUrl ? (
-                    <a href={viewUrl} target="_blank" rel="noreferrer">
+                  {documentId ? (
+                    <button
+                      type="button"
+                      className="btn-link btn-view"
+                      onClick={() => onView?.(documentId)}
+                    >
                       View
-                    </a>
+                    </button>
                   ) : (
-                    '-'
+                    '—'
                   )}
                 </td>
               </tr>

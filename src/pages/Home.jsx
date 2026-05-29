@@ -6,6 +6,7 @@ import FileUpload from '../components/FileUpload'
 import FileSearch from '../components/FileSearch'
 import FileList from '../components/FileList'
 import AISearch from '../components/AISearch'
+import DocumentPreviewModal from '../components/DocumentPreviewModal'
 import { searchDocuments, SEARCH_LAMBDA_URL } from '../utils/searchApi'
 
 export default function Home() {
@@ -17,6 +18,7 @@ export default function Home() {
   const [resultCount, setResultCount] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [previewDocumentId, setPreviewDocumentId] = useState(null)
 
   async function handleSearch() {
     const trimmed = query.trim()
@@ -105,18 +107,26 @@ export default function Home() {
                   </p>
                 )}
 
-                <FileList files={files} />
+                <FileList
+                  files={files}
+                  onView={setPreviewDocumentId}
+                />
               </div>
             </section>
           )}
 
           {activeTab === 'ai-search' && (
             <section className="tab-panel fade-in">
-              <AISearch />
+              <AISearch onView={setPreviewDocumentId} />
             </section>
           )}
         </main>
       </div>
+
+      <DocumentPreviewModal
+        documentId={previewDocumentId}
+        onClose={() => setPreviewDocumentId(null)}
+      />
     </div>
   )
 }
