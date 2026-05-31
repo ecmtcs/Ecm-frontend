@@ -1,5 +1,5 @@
-import { useNavigate } from 'react-router-dom'
-import { logout, getSession } from '../utils/auth'
+import { Link, useNavigate } from 'react-router-dom'
+import { logout, getSession, isAdmin } from '../utils/auth'
 
 export default function Sidebar({ collapsed, onToggle }) {
   const navigate = useNavigate()
@@ -27,6 +27,11 @@ export default function Sidebar({ collapsed, onToggle }) {
 
       <nav className="sidebar-nav">
         <span className="nav-item active">Dashboard</span>
+        {isAdmin(session) && (
+          <Link to="/admin/status-report" className="nav-item">
+            Status Report
+          </Link>
+        )}
       </nav>
 
       <div className="sidebar-footer">
