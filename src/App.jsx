@@ -1,10 +1,13 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Home from './pages/Home'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminRoute from './components/AdminRoute'
 import { getSession, initializeDemoUser } from './utils/auth'
+
+const AdminStatusReport = lazy(() => import('./pages/AdminStatusReport'))
 
 function PublicOnly({ children }) {
   if (getSession()) {
@@ -43,6 +46,23 @@ export default function App() {
           <ProtectedRoute>
             <Home />
           </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/status-report"
+        element={
+          <AdminRoute>
+            <Suspense
+              fallback={
+                <div className="admin-status-loading admin-status-loading--page">
+                  <span className="doc-preview-spinner" aria-hidden="true" />
+                  <span>Loading dashboard…</span>
+                </div>
+              }
+            >
+              <AdminStatusReport />
+            </Suspense>
+          </AdminRoute>
         }
       />
       <Route path="*" element={<Navigate to="/login" replace />} />

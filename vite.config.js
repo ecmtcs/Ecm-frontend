@@ -11,6 +11,9 @@ const AI_SEARCH_LAMBDA_TARGET =
 const DOCUMENT_PREVIEW_LAMBDA_TARGET =
   process.env.VITE_DOCUMENT_PREVIEW_LAMBDA_URL ||
   'https://43htd6x7vtya4cqd447tt4qpfq0pbjwk.lambda-url.us-east-1.on.aws/'
+const DOCUMENT_STATUS_LAMBDA_TARGET =
+  process.env.VITE_DOCUMENT_STATUS_LAMBDA_URL ||
+  'https://fa4miq2mznezeapjo2xcfz5xw40chnnt.lambda-url.us-east-1.on.aws/'
 
 export default defineConfig({
   plugins: [react()],
@@ -40,7 +43,14 @@ export default defineConfig({
         secure: false,
         rewrite: () => '/',
       },
-      '/api/document': {
+      '/api/document-status': {
+        target: DOCUMENT_STATUS_LAMBDA_TARGET,
+        changeOrigin: true,
+        secure: false,
+        rewrite: () => '/',
+      },
+      // Negative lookahead: match /api/document but NOT /api/document-status
+      '^/api/document(?!-status)': {
         target: DOCUMENT_PREVIEW_LAMBDA_TARGET,
         changeOrigin: true,
         secure: false,

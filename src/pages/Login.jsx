@@ -105,14 +105,14 @@ export default function Login() {
           {error && <p className="form-error">{error}</p>}
 
           <div className="form-group">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">Email or username</label>
             <input
               id="email"
-              type="email"
+              type="text"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@company.com"
+              placeholder="you@company.com or admin"
             />
           </div>
 
