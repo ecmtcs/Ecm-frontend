@@ -115,11 +115,11 @@ export default function Home() {
             </section>
           )}
 
-          {activeTab === 'ai-search' && (
+          {/* {activeTab === 'ai-search' && (
             <section className="tab-panel fade-in">
               <AISearch onView={setPreviewDocumentId} />
             </section>
-          )}
+          )} */}
         </main>
       </div>
 

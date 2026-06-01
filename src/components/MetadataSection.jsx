@@ -5,7 +5,7 @@ export default function MetadataSection({
   title,
   entries,
   emptyMessage,
-  defaultOpen = true,
+  defaultOpen = false,
 }) {
   const count = entries?.length ?? 0
 
