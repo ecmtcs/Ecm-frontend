@@ -9,6 +9,7 @@ DocumentTracker schema (from textract-map.py / process-and-vectorize-map.py):
   - Creator
 
 GET /document-status?limit=25&page=0
+GET /document-status?all=true
 
 Response:
 {
@@ -190,22 +191,30 @@ def _compute_summary(items: list[dict]) -> dict:
     }
 
 
-def get_document_status_report(limit: int = DEFAULT_PAGE_SIZE, page: int = 0) -> dict:
+def _is_truthy(value: Any) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y"}
+
+
+def get_document_status_report(
+    limit: int = DEFAULT_PAGE_SIZE,
+    page: int = 0,
+    include_all: bool = False,
+) -> dict:
     all_items = _scan_tracker_items()
     all_items.sort(key=lambda item: str(item.get("EventTime") or ""), reverse=True)
 
     total_count = len(all_items)
-    start = page * limit
-    end = start + limit
+    start = 0 if include_all else page * limit
+    end = total_count if include_all else start + limit
     page_items = all_items[start:end]
 
     return {
         "items": [_format_row(item) for item in page_items],
         "count": len(page_items),
         "totalCount": total_count,
-        "page": page,
-        "hasMore": end < total_count,
-        "lastEvaluatedKey": {"page": page + 1} if end < total_count else None,
+        "page": 0 if include_all else page,
+        "hasMore": False if include_all else end < total_count,
+        "lastEvaluatedKey": None if include_all or end >= total_count else {"page": page + 1},
         "summary": _compute_summary(all_items),
     }
 
@@ -226,6 +235,7 @@ def lambda_handler(event, context):
         params = _parse_query_params(event)
         limit = _safe_int(params.get("limit"), DEFAULT_PAGE_SIZE, minimum=1, maximum=MAX_PAGE_SIZE)
         page = _safe_int(params.get("page"), 0, minimum=0)
+        include_all = _is_truthy(params.get("all"))
 
         if params.get("lastEvaluatedKey"):
             try:
@@ -235,7 +245,7 @@ def lambda_handler(event, context):
             except json.JSONDecodeError:
                 logger.warning("Invalid lastEvaluatedKey payload ignored.")
 
-        result = get_document_status_report(limit=limit, page=page)
+        result = get_document_status_report(limit=limit, page=page, include_all=include_all)
         logger.info(
             "Returned page=%s count=%s totalCount=%s",
             result["page"],

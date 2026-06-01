@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 const CHART_COLORS = {
   Completed: '#22c55e',
@@ -32,6 +32,8 @@ function buildSlicePath(cx, cy, radius, startAngle, endAngle) {
  * Lightweight SVG pie chart — no external chart library required.
  */
 export default function StatusPieChart({ data, total }) {
+  const [activeSegment, setActiveSegment] = useState(null)
+
   const segments = useMemo(() => {
     if (!data?.length || total <= 0) return []
 
@@ -62,15 +64,31 @@ export default function StatusPieChart({ data, total }) {
 
   return (
     <div className="status-chart">
-      <svg viewBox="0 0 220 220" className="status-chart__svg" role="img" aria-label="Status distribution pie chart">
-        {segments.map((segment) => (
-          <path
-            key={segment.label}
-            d={buildSlicePath(110, 110, 90, segment.startAngle, segment.endAngle)}
-            fill={segment.color}
-          />
-        ))}
-      </svg>
+      <div className="status-chart__figure">
+        <svg viewBox="0 0 220 220" className="status-chart__svg" role="img" aria-label="Status distribution pie chart">
+          {segments.map((segment) => (
+            <path
+              key={segment.label}
+              d={buildSlicePath(110, 110, 90, segment.startAngle, segment.endAngle)}
+              fill={segment.color}
+              tabIndex="0"
+              className="status-chart__slice"
+              onBlur={() => setActiveSegment(null)}
+              onFocus={() => setActiveSegment(segment)}
+              onMouseEnter={() => setActiveSegment(segment)}
+              onMouseLeave={() => setActiveSegment(null)}
+            />
+          ))}
+        </svg>
+        {activeSegment && (
+          <div className="status-chart__tooltip" role="status">
+            <strong>{activeSegment.label}</strong>
+            <span>
+              {activeSegment.value} ({activeSegment.percent}%)
+            </span>
+          </div>
+        )}
+      </div>
 
       <ul className="status-chart__legend" aria-label="Status legend">
         {segments.map((segment) => (

@@ -8,6 +8,8 @@ const useProxy = import.meta.env.VITE_USE_LAMBDA_PROXY !== 'false'
 
 export const STATUS_REPORT_URL = useProxy ? '/api/document-status' : STATUS_REPORT_DIRECT
 
+const REQUEST_TIMEOUT_MS = 20000
+
 function normalizeStatusRow(item) {
   if (!item || typeof item !== 'object') return null
 
@@ -34,23 +36,39 @@ function normalizeSummary(summary = {}) {
 /**
  * Fetch paginated document status report (admin only — caller must verify role).
  */
-export async function fetchDocumentStatusReport({ limit = 25, page = 0, lastEvaluatedKey = null } = {}) {
+export async function fetchDocumentStatusReport({
+  limit = 25,
+  page = 0,
+  lastEvaluatedKey = null,
+  all = false,
+} = {}) {
   const params = new URLSearchParams({ limit: String(limit), page: String(page) })
+
+  if (all) {
+    params.set('all', 'true')
+  }
 
   if (lastEvaluatedKey) {
     params.set('lastEvaluatedKey', JSON.stringify(lastEvaluatedKey))
   }
 
   const url = `${STATUS_REPORT_URL}?${params.toString()}`
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
   let response
   try {
-    response = await fetch(url, { method: 'GET' })
+    response = await fetch(url, { method: 'GET', signal: controller.signal })
   } catch (error) {
     console.error('[StatusReport] Network error', error)
+    if (error?.name === 'AbortError') {
+      throw new Error('Document status service timed out. Please retry.')
+    }
     throw new Error(
       'Could not reach document status service. Check Lambda Function URL and /api/document-status proxy.'
     )
+  } finally {
+    window.clearTimeout(timeoutId)
   }
 
   const rawText = await response.text()
@@ -76,6 +94,57 @@ export async function fetchDocumentStatusReport({ limit = 25, page = 0, lastEval
     hasMore: Boolean(data.hasMore),
     lastEvaluatedKey: data.lastEvaluatedKey ?? null,
     summary: normalizeSummary(data.summary),
+  }
+}
+
+/**
+ * Fetch all pages for the status report so client-side filtering/sorting can
+ * operate on the complete dataset.
+ */
+export async function fetchAllDocumentStatusRecords({ pageSize = 100, maxPages = 1000 } = {}) {
+  const firstResponse = await fetchDocumentStatusReport({
+    limit: pageSize,
+    page: 0,
+    all: true,
+  })
+
+  if (!firstResponse.hasMore || firstResponse.items.length >= firstResponse.totalCount) {
+    return {
+      items: firstResponse.items,
+      summary: firstResponse.summary,
+    }
+  }
+
+  const allItems = []
+  let page = 0
+  let hasMore = true
+  let summary = firstResponse.summary
+  let lastEvaluatedKey = null
+
+  while (hasMore && page < maxPages) {
+    const response = await fetchDocumentStatusReport({
+      limit: pageSize,
+      page,
+      lastEvaluatedKey,
+    })
+
+    if (!summary) {
+      summary = response.summary
+    }
+
+    allItems.push(...response.items)
+    hasMore = response.hasMore
+    lastEvaluatedKey = response.lastEvaluatedKey
+    page += 1
+  }
+
+  if (page >= maxPages && hasMore) {
+    throw new Error('Status report pagination exceeded safe limit. Please narrow the dataset.')
+  }
+
+  return {
+    items: allItems,
+    summary: summary || normalizeSummary(),
   }
 }
 

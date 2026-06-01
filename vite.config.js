@@ -15,6 +15,13 @@ const DOCUMENT_STATUS_LAMBDA_TARGET =
   process.env.VITE_DOCUMENT_STATUS_LAMBDA_URL ||
   'https://fa4miq2mznezeapjo2xcfz5xw40chnnt.lambda-url.us-east-1.on.aws/'
 
+function rewriteApiPrefix(prefix) {
+  return (path) => {
+    const rewritten = path.replace(prefix, '') || '/'
+    return rewritten.startsWith('?') ? `/${rewritten}` : rewritten
+  }
+}
+
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -29,32 +36,32 @@ export default defineConfig({
         target: SEARCH_LAMBDA_TARGET,
         changeOrigin: true,
         secure: false,
-        rewrite: () => '/',
+        rewrite: rewriteApiPrefix(/^\/api\/search/),
       },
       '/api/upload': {
         target: UPLOAD_LAMBDA_TARGET,
         changeOrigin: true,
         secure: false,
-        rewrite: () => '/',
+        rewrite: rewriteApiPrefix(/^\/api\/upload/),
       },
       '/api/ai-search': {
         target: AI_SEARCH_LAMBDA_TARGET,
         changeOrigin: true,
         secure: false,
-        rewrite: () => '/',
+        rewrite: rewriteApiPrefix(/^\/api\/ai-search/),
       },
       '/api/document-status': {
         target: DOCUMENT_STATUS_LAMBDA_TARGET,
         changeOrigin: true,
         secure: false,
-        rewrite: () => '/',
+        rewrite: rewriteApiPrefix(/^\/api\/document-status/),
       },
       // Negative lookahead: match /api/document but NOT /api/document-status
       '^/api/document(?!-status)': {
         target: DOCUMENT_PREVIEW_LAMBDA_TARGET,
         changeOrigin: true,
         secure: false,
-        rewrite: () => '/',
+        rewrite: rewriteApiPrefix(/^\/api\/document/),
       },
     },
   },

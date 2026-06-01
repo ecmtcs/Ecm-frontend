@@ -2,14 +2,28 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import StatusPieChart from '../components/StatusPieChart'
+import DateRangeFilter from '../components/DateRangeFilter'
 import { isAdmin } from '../utils/auth'
 import {
   buildStatusChartData,
-  fetchDocumentStatusReport,
+  fetchAllDocumentStatusRecords,
 } from '../utils/statusReportApi'
 import './AdminStatusReport.css'
 
-const PAGE_SIZE = 25
+const PAGE_SIZE = 100
+const DEFAULT_SORT = { key: 'timestamp', direction: 'desc' }
+const TODAY_ISO = new Date().toISOString().slice(0, 10)
+const SORTABLE_COLUMNS = [
+  { key: 'filename', label: 'Filename' },
+  { key: 'date', label: 'Date' },
+  { key: 'timestamp', label: 'Timestamp' },
+  { key: 'status', label: 'Status' },
+]
+
+function normalizeSelectedDate(value) {
+  if (!value) return ''
+  return value > TODAY_ISO ? TODAY_ISO : value
+}
 
 function StatusBadge({ status }) {
   const normalized = String(status || '').toUpperCase()
@@ -30,61 +44,162 @@ function StatusBadge({ status }) {
   return <span className={className}>{label}</span>
 }
 
+function extractRecordDate(row) {
+  const rawDate = String(row?.date || '').trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+    return rawDate
+  }
+
+  const rawTimestamp = String(row?.timestamp || '').trim()
+  const timestampDateMatch = rawTimestamp.match(/^(\d{4}-\d{2}-\d{2})/)
+  if (timestampDateMatch) {
+    return timestampDateMatch[1]
+  }
+
+  return ''
+}
+
+function toSortableDateNumber(value) {
+  const rawValue = String(value || '').trim()
+  if (!rawValue || rawValue === '—') return null
+
+  const dateOnlyMatch = rawValue.match(/^(\d{4}-\d{2}-\d{2})$/)
+  if (dateOnlyMatch) {
+    const dateOnlyValue = Date.parse(`${dateOnlyMatch[1]}T00:00:00Z`)
+    return Number.isNaN(dateOnlyValue) ? null : dateOnlyValue
+  }
+
+  const normalizedFraction = rawValue.replace(/(\.\d{3})\d+/, '$1')
+  const withTimezone = /[zZ]|[+-]\d{2}:\d{2}$/.test(normalizedFraction)
+    ? normalizedFraction
+    : `${normalizedFraction}Z`
+  const parsed = Date.parse(withTimezone)
+
+  if (!Number.isNaN(parsed)) {
+    return parsed
+  }
+
+  const partialDateMatch = rawValue.match(/^(\d{4}-\d{2}-\d{2})/)
+  if (partialDateMatch) {
+    const fallback = Date.parse(`${partialDateMatch[1]}T00:00:00Z`)
+    return Number.isNaN(fallback) ? null : fallback
+  }
+
+  return null
+}
+
+function compareRows(a, b, { key, direction }) {
+  const modifier = direction === 'asc' ? 1 : -1
+
+  if (key === 'date') {
+    const left = toSortableDateNumber(a.date)
+    const right = toSortableDateNumber(b.date)
+    if (left !== null && right !== null && left !== right) {
+      return (left - right) * modifier
+    }
+    if (left === null && right !== null) return 1
+    if (left !== null && right === null) return -1
+  }
+
+  if (key === 'timestamp') {
+    const left = toSortableDateNumber(a.timestamp)
+    const right = toSortableDateNumber(b.timestamp)
+    if (left !== null && right !== null && left !== right) {
+      return (left - right) * modifier
+    }
+    if (left === null && right !== null) return 1
+    if (left !== null && right === null) return -1
+  }
+
+  const leftText = String(a[key] ?? '').toLowerCase()
+  const rightText = String(b[key] ?? '').toLowerCase()
+  const textCompare = leftText.localeCompare(rightText, undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  })
+
+  if (textCompare !== 0) {
+    return textCompare * modifier
+  }
+
+  return String(a.documentId ?? '').localeCompare(String(b.documentId ?? ''))
+}
+
 export default function AdminStatusReport() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [items, setItems] = useState([])
   const [summary, setSummary] = useState(null)
-  const [page, setPage] = useState(0)
-  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [creatorFilter, setCreatorFilter] = useState('all')
+  const [searchInput, setSearchInput] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortConfig, setSortConfig] = useState(() => ({ ...DEFAULT_SORT }))
 
-  const loadReport = useCallback(async (pageNumber, append = false) => {
+  const loadReport = useCallback(async () => {
     if (!isAdmin()) {
       setError('Unauthorized access.')
       setLoading(false)
       return
     }
 
-    if (append) {
-      setLoadingMore(true)
-    } else {
-      setLoading(true)
-    }
+    setLoading(true)
     setError('')
 
     try {
-      console.info('[StatusReport] Fetching page', pageNumber)
-      const data = await fetchDocumentStatusReport({
-        limit: PAGE_SIZE,
-        page: pageNumber,
-      })
-
+      console.info('[StatusReport] Fetching all records')
+      const data = await fetchAllDocumentStatusRecords({ pageSize: PAGE_SIZE })
       setSummary(data.summary)
-      setHasMore(data.hasMore)
-      setPage(data.page)
-      setItems((prev) => (append ? [...prev, ...data.items] : data.items))
+      setItems(data.items)
     } catch (err) {
       console.error('[StatusReport] Load failed', err)
-      if (!append) {
-        setItems([])
-        setSummary(null)
-      }
+      setItems([])
+      setSummary(null)
       setError(err.message || 'Failed to load status report.')
     } finally {
       setLoading(false)
-      setLoadingMore(false)
     }
   }, [])
 
   useEffect(() => {
-    loadReport(0, false)
+    loadReport()
   }, [loadReport])
 
+  const isDateRangeActive = Boolean(fromDate || toDate)
+
+  const selectedDateRange = useMemo(() => {
+    if (fromDate && toDate && fromDate > toDate) {
+      return { start: toDate, end: fromDate }
+    }
+
+    return { start: fromDate, end: toDate }
+  }, [fromDate, toDate])
+
+  const dateRangeFilteredItems = useMemo(
+    () =>
+      items.filter((row) => {
+        const recordDate = extractRecordDate(row)
+        if (selectedDateRange.start && (!recordDate || recordDate < selectedDateRange.start)) return false
+        if (selectedDateRange.end && (!recordDate || recordDate > selectedDateRange.end)) return false
+        return true
+      }),
+    [items, selectedDateRange]
+  )
+
+  const chartStatusDistribution = useMemo(() => {
+    const distribution = {}
+    dateRangeFilteredItems.forEach((row) => {
+      const statusKey = String(row.status || 'UNKNOWN').toUpperCase()
+      distribution[statusKey] = (distribution[statusKey] || 0) + 1
+    })
+    return distribution
+  }, [dateRangeFilteredItems])
+
   const chartData = useMemo(
-    () => buildStatusChartData(summary?.statusDistribution),
-    [summary?.statusDistribution]
+    () => buildStatusChartData(chartStatusDistribution),
+    [chartStatusDistribution]
   )
 
   const chartTotal = useMemo(
@@ -92,9 +207,91 @@ export default function AdminStatusReport() {
     [chartData]
   )
 
-  function handleLoadMore() {
-    if (!hasMore || loadingMore) return
-    loadReport(page + 1, true)
+  const creatorOptions = useMemo(() => {
+    const creators = new Set()
+    items.forEach((row) => {
+      const creator = String(row.creator || '').trim()
+      if (creator) creators.add(creator)
+    })
+    return Array.from(creators).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+  }, [items])
+
+  const statusTableFilteredItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+
+    return dateRangeFilteredItems.filter((row) => {
+      if (creatorFilter !== 'all' && row.creator !== creatorFilter) {
+        return false
+      }
+
+      if (!query) return true
+
+      const searchable = [
+        row.documentId,
+        row.filename,
+        row.creator,
+        row.date,
+        row.timestamp,
+        row.status,
+      ]
+
+      return searchable.some((value) => String(value ?? '').toLowerCase().includes(query))
+    })
+  }, [dateRangeFilteredItems, creatorFilter, searchQuery])
+
+  const sortedRows = useMemo(
+    () => [...statusTableFilteredItems].sort((left, right) => compareRows(left, right, sortConfig)),
+    [statusTableFilteredItems, sortConfig]
+  )
+
+  const dateRangeSummary = useMemo(() => {
+    if (selectedDateRange.start && selectedDateRange.end) {
+      return `${selectedDateRange.start} to ${selectedDateRange.end}`
+    }
+    if (selectedDateRange.start) {
+      return `from ${selectedDateRange.start}`
+    }
+    if (selectedDateRange.end) {
+      return `up to ${selectedDateRange.end}`
+    }
+    return 'all dates'
+  }, [selectedDateRange])
+
+  function handleDateRangeChange({ from, to }) {
+    setFromDate(normalizeSelectedDate(from))
+    setToDate(normalizeSelectedDate(to))
+  }
+
+  function handleDateRangeClear() {
+    setFromDate('')
+    setToDate('')
+  }
+
+  function handleSearchSubmit(event) {
+    event.preventDefault()
+    setSearchQuery(searchInput.trim())
+  }
+
+  function handleResetFilters() {
+    setFromDate('')
+    setToDate('')
+    setCreatorFilter('all')
+    setSearchInput('')
+    setSearchQuery('')
+    setSortConfig({ ...DEFAULT_SORT })
+  }
+
+  function handleSortKeyChange(event) {
+    const column = event.target.value
+    setSortConfig((prev) => {
+      const defaultDirection = column === 'date' || column === 'timestamp' ? 'desc' : 'asc'
+      return { key: column, direction: defaultDirection }
+    })
+  }
+
+  function handleSortDirectionChange(event) {
+    const direction = event.target.value
+    setSortConfig((prev) => ({ ...prev, direction }))
   }
 
   return (
@@ -116,7 +313,7 @@ export default function AdminStatusReport() {
           {error && (
             <div className="admin-status-error" role="alert">
               <p>{error}</p>
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => loadReport(0, false)}>
+              <button type="button" className="btn btn-outline btn-sm" onClick={loadReport}>
                 Retry
               </button>
             </div>
@@ -143,77 +340,124 @@ export default function AdminStatusReport() {
                 </article>
               </section>
 
+              <DateRangeFilter
+                fromDate={fromDate}
+                toDate={toDate}
+                maxDate={TODAY_ISO}
+                onChange={handleDateRangeChange}
+                onClear={handleDateRangeClear}
+              />
+
               <section className="status-chart-panel fade-in" aria-label="Status distribution">
-                <h2>Status Overview</h2>
+                <div className="status-chart-header">
+                  <div>
+                    <h2>Status Overview</h2>
+                    {isDateRangeActive && <p className="text-muted">Filtered by {dateRangeSummary}</p>}
+                  </div>
+                </div>
                 {loading && !summary ? (
                   <p className="text-muted">Loading chart…</p>
                 ) : (
-                  <StatusPieChart data={chartData} total={chartTotal} />
+                  <div className="status-chart-content">
+                    <StatusPieChart data={chartData} total={chartTotal} />
+                  </div>
                 )}
               </section>
 
               <section className="status-table-section fade-in" aria-label="Document status table">
                 <div className="status-table-header">
                   <h2>Status Report</h2>
-                  {summary && (
+                  {!loading && (
                     <p className="text-muted">
-                      {summary.totalFiles} record{summary.totalFiles === 1 ? '' : 's'} · sorted by latest timestamp
+                      {sortedRows.length} record{sortedRows.length === 1 ? '' : 's'} shown
+                      {' '}of {dateRangeFilteredItems.length} in {dateRangeSummary}
                     </p>
                   )}
                 </div>
+
+                <form className="status-report-toolbar" onSubmit={handleSearchSubmit}>
+                  <label className="status-filter-field status-toolbar-field--search">
+                    <span>Search records</span>
+                    <input
+                      type="search"
+                      value={searchInput}
+                      onChange={(event) => setSearchInput(event.target.value)}
+                      placeholder="Filename, status, timestamp..."
+                    />
+                  </label>
+                  <button type="submit" className="btn btn-outline">
+                    Search
+                  </button>
+                  <label className="status-filter-field status-toolbar-field">
+                    <span>Creator</span>
+                    <select value={creatorFilter} onChange={(event) => setCreatorFilter(event.target.value)}>
+                      <option value="all">All creators</option>
+                      {creatorOptions.map((creator) => (
+                        <option key={creator} value={creator}>
+                          {creator}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="status-filter-field status-toolbar-field">
+                    <span>Sort by</span>
+                    <select value={sortConfig.key} onChange={handleSortKeyChange}>
+                      {SORTABLE_COLUMNS.map((column) => (
+                        <option key={column.key} value={column.key}>
+                          {column.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="status-filter-field status-toolbar-field">
+                    <span>Order</span>
+                    <select value={sortConfig.direction} onChange={handleSortDirectionChange}>
+                      <option value="asc">Ascending</option>
+                      <option value="desc">Descending</option>
+                    </select>
+                  </label>
+                  <button type="button" className="btn btn-outline" onClick={handleResetFilters}>
+                    Reset
+                  </button>
+                </form>
 
                 {loading && items.length === 0 ? (
                   <div className="admin-status-loading">
                     <span className="doc-preview-spinner" aria-hidden="true" />
                     <span>Loading status records…</span>
                   </div>
-                ) : items.length === 0 ? (
+                ) : sortedRows.length === 0 ? (
                   <div className="empty-state fade-in">
                     <p>No status records found.</p>
-                    <span className="text-muted">DocumentTracker is empty or unreachable.</span>
+                    <span className="text-muted">Try clearing filters or broadening your date range.</span>
                   </div>
                 ) : (
-                  <>
-                    <div className="file-table-wrap file-table-wrap--search">
-                      <table className="file-table file-table--search">
-                        <thead>
-                          <tr>
-                            <th>Filename</th>
-                            <th>Creator</th>
-                            <th>Date</th>
-                            <th>Timestamp</th>
-                            <th>Status</th>
+                  <div className="file-table-wrap file-table-wrap--search">
+                    <table className="file-table file-table--search">
+                      <thead>
+                        <tr>
+                          <th>Filename</th>
+                          <th>Creator</th>
+                          <th>Date</th>
+                          <th>Timestamp</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedRows.map((row) => (
+                          <tr key={`${row.documentId}-${row.timestamp}`} className="table-row">
+                            <td title={row.filename}>{row.filename}</td>
+                            <td>{row.creator}</td>
+                            <td>{row.date}</td>
+                            <td className="cell-mono">{row.timestamp}</td>
+                            <td>
+                              <StatusBadge status={row.status} />
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {items.map((row) => (
-                            <tr key={`${row.documentId}-${row.timestamp}`} className="table-row">
-                              <td title={row.filename}>{row.filename}</td>
-                              <td>{row.creator}</td>
-                              <td>{row.date}</td>
-                              <td className="cell-mono">{row.timestamp}</td>
-                              <td>
-                                <StatusBadge status={row.status} />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {hasMore && (
-                      <div className="status-table-actions">
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          onClick={handleLoadMore}
-                          disabled={loadingMore}
-                        >
-                          {loadingMore ? 'Loading…' : 'Load more'}
-                        </button>
-                      </div>
-                    )}
-                  </>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </section>
             </>
