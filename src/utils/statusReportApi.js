@@ -151,14 +151,38 @@ export async function fetchAllDocumentStatusRecords({ pageSize = 100, maxPages =
 /**
  * Build pie chart segments from status distribution.
  */
+// export function buildStatusChartData(statusDistribution = {}) {
+//   const labelMap = {
+//     INDEXED: 'Indexed',
+//     // COMPLETED: 'Completed',
+//     PROCESSING: 'Processing',
+//     UPLOADED: 'Uploaded',
+//     FAILED: 'Failed',
+//   }
 export function buildStatusChartData(statusDistribution = {}) {
-  const labelMap = {
-    INDEXED: 'Indexed',
-    // COMPLETED: 'Completed',
-    PROCESSING: 'Processing',
-    UPLOADED: 'Uploaded',
-    FAILED: 'Failed',
-  }
+  return [
+    {
+      label: 'INDEXED',
+      value: Number(statusDistribution.INDEXED || 0),
+      color: '#10b981',
+    },
+    {
+      label: 'PROCESSING',
+      value: Number(statusDistribution.PROCESSING || 0),
+      color: '#3b82f6',
+    },
+    {
+      label: 'UPLOADED',
+      value: Number(statusDistribution.UPLOADED || 0),
+      color: '#f59e0b',
+    },
+    {
+      label: 'FAILED',
+      value: Number(statusDistribution.FAILED || 0),
+      color: '#ef4444',
+    },
+  ]
+
 
   const grouped = { Indexed: 0, Processing: 0, Failed: 0, Other: 0 }
 
