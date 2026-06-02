@@ -153,14 +153,14 @@ export async function fetchAllDocumentStatusRecords({ pageSize = 100, maxPages =
  */
 export function buildStatusChartData(statusDistribution = {}) {
   const labelMap = {
-    INDEXED: 'Completed',
-    COMPLETED: 'Completed',
+    INDEXED: 'Indexed',
+    // COMPLETED: 'Completed',
     PROCESSING: 'Processing',
-    UPLOADED: 'Processing',
+    UPLOADED: 'Uploaded',
     FAILED: 'Failed',
   }
 
-  const grouped = { Completed: 0, Processing: 0, Failed: 0, Other: 0 }
+  const grouped = { Indexed: 0, Processing: 0, Failed: 0, Other: 0 }
 
   for (const [status, count] of Object.entries(statusDistribution)) {
     const label = labelMap[String(status).toUpperCase()] || 'Other'
