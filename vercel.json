@@ -21,6 +21,10 @@
       "destination": "https://43htd6x7vtya4cqd447tt4qpfq0pbjwk.lambda-url.us-east-1.on.aws/"
     },
     {
+      "source": "/api/document-delete",
+      "destination": "https://REPLACE_AFTER_DEPLOY.lambda-url.us-east-1.on.aws/"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

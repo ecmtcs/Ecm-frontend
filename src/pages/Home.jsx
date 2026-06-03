@@ -7,6 +7,7 @@ import FileSearch from '../components/FileSearch'
 import FileList from '../components/FileList'
 import AISearch from '../components/AISearch'
 import DocumentPreviewModal from '../components/DocumentPreviewModal'
+import { deleteDocument } from '../utils/documentApi'
 import { searchDocuments, SEARCH_LAMBDA_URL } from '../utils/searchApi'
 
 export default function Home() {
@@ -19,6 +20,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [previewDocumentId, setPreviewDocumentId] = useState(null)
+  const [deletingId, setDeletingId] = useState('')
 
   async function handleSearch() {
     const trimmed = query.trim()
@@ -47,6 +49,32 @@ export default function Home() {
       setError(err.message || 'Search failed')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDelete(documentId) {
+    const title =
+      files.find((file) => (file.uuid || file.DocumentId) === documentId)?.DocumentTitle ||
+      documentId
+
+    if (!window.confirm(`Delete "${title}" permanently from S3 and DynamoDB?`)) {
+      return
+    }
+
+    setDeletingId(documentId)
+    setError('')
+
+    try {
+      await deleteDocument(documentId)
+      setFiles((prev) => prev.filter((file) => (file.uuid || file.DocumentId) !== documentId))
+      setResultCount((prev) => (typeof prev === 'number' ? Math.max(0, prev - 1) : prev))
+      if (previewDocumentId === documentId) {
+        setPreviewDocumentId(null)
+      }
+    } catch (err) {
+      setError(err.message || 'Delete failed')
+    } finally {
+      setDeletingId('')
     }
   }
 
@@ -110,6 +138,8 @@ export default function Home() {
                 <FileList
                   files={files}
                   onView={setPreviewDocumentId}
+                  onDelete={handleDelete}
+                  deletingId={deletingId}
                 />
               </div>
             </section>
