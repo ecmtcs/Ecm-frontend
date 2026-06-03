@@ -8,7 +8,7 @@ function getDocumentId(file) {
   return file?.uuid || file?.DocumentId || file?.documentId || ''
 }
 
-export default function FileList({ files, onView }) {
+export default function FileList({ files, onView, onDelete, deletingId = '' }) {
   if (!files.length) {
     return (
       <div className="empty-state empty-state--full fade-in">
@@ -28,7 +28,8 @@ export default function FileList({ files, onView }) {
             {columns.map((column) => (
               <th key={column}>{formatSearchColumnLabel(column)}</th>
             ))}
-            <th className="col-actions">Document</th>
+            <th className="col-actions">View</th>
+            <th className="col-actions">Delete</th>
           </tr>
         </thead>
         <tbody>
@@ -51,6 +52,20 @@ export default function FileList({ files, onView }) {
                       onClick={() => onView?.(documentId)}
                     >
                       View
+                    </button>
+                  ) : (
+                    '—'
+                  )}
+                </td>
+                <td className="col-actions">
+                  {documentId ? (
+                    <button
+                      type="button"
+                      className="btn-link btn-delete"
+                      disabled={deletingId === documentId}
+                      onClick={() => onDelete?.(documentId)}
+                    >
+                      {deletingId === documentId ? 'Deleting…' : 'Delete'}
                     </button>
                   ) : (
                     '—'

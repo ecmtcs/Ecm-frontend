@@ -4,9 +4,14 @@ const DOCUMENT_PREVIEW_DIRECT =
   import.meta.env.VITE_DOCUMENT_PREVIEW_LAMBDA_URL?.trim() ||
   'https://43htd6x7vtya4cqd447tt4qpfq0pbjwk.lambda-url.us-east-1.on.aws/'
 
+const DOCUMENT_DELETE_DIRECT =
+  import.meta.env.VITE_DOCUMENT_DELETE_LAMBDA_URL?.trim() ||
+  'https://REPLACE_AFTER_DEPLOY.lambda-url.us-east-1.on.aws/'
+
 const useProxy = import.meta.env.VITE_USE_LAMBDA_PROXY !== 'false'
 
 export const DOCUMENT_PREVIEW_URL = useProxy ? '/api/document' : DOCUMENT_PREVIEW_DIRECT
+export const DOCUMENT_DELETE_URL = useProxy ? '/api/document-delete' : DOCUMENT_DELETE_DIRECT
 
 /**
  * Load document preview URL + full metadata from DynamoDB via Lambda.
@@ -50,5 +55,43 @@ export async function fetchDocumentPreview(documentId) {
     metadata: data.metadata ?? {},
     systemMetadata: data.systemMetadata,
     documentMetadata: data.documentMetadata,
+  }
+}
+
+/**
+ * Delete document from S3 Archival/ and DynamoDB by UUID.
+ * @param {string} documentId
+ */
+export async function deleteDocument(documentId) {
+  const id = String(documentId ?? '').trim()
+  if (!id || id === '—') {
+    throw new Error('Document ID is required.')
+  }
+
+  let response
+  try {
+    response = await fetch(DOCUMENT_DELETE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documentId: id }),
+    })
+  } catch {
+    throw new Error(
+      'Could not reach document delete service. Deploy document-delete-lambda and configure /api/document-delete proxy.'
+    )
+  }
+
+  const data = parseLambdaJson(await response.text(), response)
+
+  if (!response.ok) {
+    throw new Error(data?.error || `Delete failed (HTTP ${response.status}).`)
+  }
+  if (data?.error) {
+    throw new Error(data.error)
+  }
+
+  return {
+    documentId: data.documentId ?? id,
+    deleted: Boolean(data.deleted),
   }
 }
