@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { fetchDocumentPreview } from '../utils/documentApi'
+import {
+  downloadDocumentFile,
+  fetchDocumentPreview,
+  updateDocumentMetadata,
+} from '../utils/documentApi'
+import { fetchDocumentVersions } from '../utils/versionApi'
 import {
   getDocumentTitle,
   splitDocumentMetadata,
@@ -7,6 +12,24 @@ import {
 import DocumentPreviewContent from './DocumentPreviewContent'
 import MetadataSection from './MetadataSection'
 import './DocumentPreviewModal.css'
+
+/** Prepend a "Version" row (e.g. "V3 (latest of 3)") to system metadata. */
+async function withVersionEntry(documentId, systemEntries) {
+  try {
+    const { versions } = await fetchDocumentVersions(documentId)
+    if (!versions.length) return systemEntries
+
+    const latestIndex = versions.findIndex((v) => v.isLatest)
+    const idx = latestIndex >= 0 ? latestIndex : 0
+    const versionNumber = versions.length - idx
+    const value =
+      versions.length > 1 ? `V${versionNumber} (latest of ${versions.length})` : 'V1'
+
+    return [{ key: 'Version', label: 'Version', value }, ...systemEntries]
+  } catch {
+    return systemEntries
+  }
+}
 
 export default function DocumentPreviewModal({ documentId, onClose }) {
   const [loading, setLoading] = useState(false)
@@ -17,10 +40,14 @@ export default function DocumentPreviewModal({ documentId, onClose }) {
   const [filePath, setFilePath] = useState('')
   const [systemEntries, setSystemEntries] = useState([])
   const [documentEntries, setDocumentEntries] = useState([])
+  const [savingMetadata, setSavingMetadata] = useState(false)
+  const [saveNotice, setSaveNotice] = useState('')
+  const [downloading, setDownloading] = useState(false)
 
   const loadPreview = useCallback(async (id) => {
     setLoading(true)
     setError('')
+    setSaveNotice('')
     setPreviewUrl('')
 
     try {
@@ -36,7 +63,7 @@ export default function DocumentPreviewModal({ documentId, onClose }) {
       setPreviewUrl(data.previewUrl)
       setMimeType(data.mimeType ?? metadata.MimeType ?? '')
       setFilePath(metadata.FilePath ?? metadata.filePath ?? '')
-      setSystemEntries(system)
+      setSystemEntries(await withVersionEntry(id, system))
       setDocumentEntries(document)
       setTitle(getDocumentTitle(metadata))
     } catch (err) {
@@ -47,6 +74,35 @@ export default function DocumentPreviewModal({ documentId, onClose }) {
       setLoading(false)
     }
   }, [])
+
+  const handleSaveMetadata = useCallback(
+    async (changes) => {
+      setSavingMetadata(true)
+      setError('')
+      setSaveNotice('')
+      try {
+        const { metadata } = await updateDocumentMetadata(documentId, changes)
+        const { document } = splitDocumentMetadata({ ...metadata })
+        setDocumentEntries(document)
+        setSaveNotice('Document metadata updated.')
+      } catch (err) {
+        setError(err.message || 'Failed to update metadata.')
+      } finally {
+        setSavingMetadata(false)
+      }
+    },
+    [documentId]
+  )
+
+  const handleDownload = useCallback(async () => {
+    if (!previewUrl) return
+    setDownloading(true)
+    try {
+      await downloadDocumentFile({ url: previewUrl, title, filePath, mimeType })
+    } finally {
+      setDownloading(false)
+    }
+  }, [previewUrl, title, filePath, mimeType])
 
   useEffect(() => {
     if (!documentId) return
@@ -85,14 +141,24 @@ export default function DocumentPreviewModal({ documentId, onClose }) {
             <h2 id="doc-preview-title">{title}</h2>
             <p className="doc-preview-id text-muted">{documentId}</p>
           </div>
-          <button
-            type="button"
-            className="doc-preview-close"
-            onClick={onClose}
-            aria-label="Close preview"
-          >
-            ×
-          </button>
+          <div className="doc-preview-header-actions">
+            <button
+              type="button"
+              className="btn btn-outline btn-sm doc-preview-download"
+              onClick={handleDownload}
+              disabled={!previewUrl || loading || downloading}
+            >
+              {downloading ? 'Exporting…' : 'Download'}
+            </button>
+            <button
+              type="button"
+              className="doc-preview-close"
+              onClick={onClose}
+              aria-label="Close preview"
+            >
+              ×
+            </button>
+          </div>
         </header>
 
         {error ? (
@@ -132,10 +198,14 @@ export default function DocumentPreviewModal({ documentId, onClose }) {
                     entries={systemEntries}
                     emptyMessage="No system metadata available."
                   />
+                  {saveNotice && <p className="doc-preview-save-notice">{saveNotice}</p>}
                   <MetadataSection
                     title="Document metadata"
                     entries={documentEntries}
                     emptyMessage="No additional document metadata."
+                    editable
+                    onSave={handleSaveMetadata}
+                    saving={savingMetadata}
                   />
                 </>
               )}

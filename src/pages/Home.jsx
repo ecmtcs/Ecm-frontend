@@ -7,6 +7,7 @@ import FileSearch from '../components/FileSearch'
 import FileList from '../components/FileList'
 import AISearch from '../components/AISearch'
 import DocumentPreviewModal from '../components/DocumentPreviewModal'
+import DocumentVersionsModal from '../components/DocumentVersionsModal'
 import { deleteDocument } from '../utils/documentApi'
 import { searchDocuments, SEARCH_LAMBDA_URL } from '../utils/searchApi'
 
@@ -20,7 +21,12 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [previewDocumentId, setPreviewDocumentId] = useState(null)
+  const [versionsDocument, setVersionsDocument] = useState(null)
   const [deletingId, setDeletingId] = useState('')
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
+  const docId = (file) => file?.uuid || file?.DocumentId || file?.documentId || ''
 
   async function handleSearch() {
     const trimmed = query.trim()
@@ -34,6 +40,7 @@ export default function Home() {
     setLoading(true)
     setError('')
     setResultCount(null)
+    setSelectedIds(new Set())
 
     try {
       console.info('[ECM Search] POST', SEARCH_LAMBDA_URL)
@@ -66,8 +73,14 @@ export default function Home() {
 
     try {
       await deleteDocument(documentId)
-      setFiles((prev) => prev.filter((file) => (file.uuid || file.DocumentId) !== documentId))
+      setFiles((prev) => prev.filter((file) => docId(file) !== documentId))
       setResultCount((prev) => (typeof prev === 'number' ? Math.max(0, prev - 1) : prev))
+      setSelectedIds((prev) => {
+        if (!prev.has(documentId)) return prev
+        const next = new Set(prev)
+        next.delete(documentId)
+        return next
+      })
       if (previewDocumentId === documentId) {
         setPreviewDocumentId(null)
       }
@@ -76,6 +89,70 @@ export default function Home() {
     } finally {
       setDeletingId('')
     }
+  }
+
+  function handleToggleSelect(documentId) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(documentId)) next.delete(documentId)
+      else next.add(documentId)
+      return next
+    })
+  }
+
+  function handleToggleSelectAll() {
+    const ids = files.map(docId).filter(Boolean)
+    setSelectedIds((prev) => {
+      const allSelected = ids.length > 0 && ids.every((id) => prev.has(id))
+      return allSelected ? new Set() : new Set(ids)
+    })
+  }
+
+  async function handleBulkDelete() {
+    const ids = [...selectedIds]
+    if (!ids.length) return
+
+    if (
+      !window.confirm(
+        `Delete ${ids.length} selected document${ids.length === 1 ? '' : 's'} permanently from S3 and DynamoDB?`
+      )
+    ) {
+      return
+    }
+
+    setBulkDeleting(true)
+    setError('')
+
+    const outcomes = await Promise.allSettled(ids.map((id) => deleteDocument(id)))
+    const deletedIds = ids.filter((_, i) => outcomes[i].status === 'fulfilled')
+
+    if (deletedIds.length) {
+      const deletedSet = new Set(deletedIds)
+      setFiles((prev) => prev.filter((file) => !deletedSet.has(docId(file))))
+      setResultCount((prev) =>
+        typeof prev === 'number' ? Math.max(0, prev - deletedIds.length) : prev
+      )
+      if (deletedSet.has(previewDocumentId)) {
+        setPreviewDocumentId(null)
+      }
+    }
+
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      deletedIds.forEach((id) => next.delete(id))
+      return next
+    })
+
+    const failed = ids.length - deletedIds.length
+    if (failed > 0) {
+      setError(`${failed} document${failed === 1 ? '' : 's'} could not be deleted.`)
+    }
+
+    setBulkDeleting(false)
+  }
+
+  function handleOpenVersions(documentId, title) {
+    setVersionsDocument({ documentId, title })
   }
 
   function handleToggleSidebar() {
@@ -135,11 +212,43 @@ export default function Home() {
                   </p>
                 )}
 
+                {selectedIds.size > 0 && (
+                  <div className="bulk-actions-bar fade-in">
+                    <span className="bulk-actions-count">
+                      {selectedIds.size} selected
+                    </span>
+                    <div className="bulk-actions-buttons">
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        onClick={handleBulkDelete}
+                        disabled={bulkDeleting}
+                      >
+                        {bulkDeleting
+                          ? 'Deleting…'
+                          : `Delete selected (${selectedIds.size})`}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={() => setSelectedIds(new Set())}
+                        disabled={bulkDeleting}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <FileList
                   files={files}
                   onView={setPreviewDocumentId}
+                  onVersions={handleOpenVersions}
                   onDelete={handleDelete}
                   deletingId={deletingId}
+                  selectedIds={selectedIds}
+                  onToggleSelect={handleToggleSelect}
+                  onToggleSelectAll={handleToggleSelectAll}
                 />
               </div>
             </section>
@@ -156,6 +265,12 @@ export default function Home() {
       <DocumentPreviewModal
         documentId={previewDocumentId}
         onClose={() => setPreviewDocumentId(null)}
+      />
+
+      <DocumentVersionsModal
+        documentId={versionsDocument?.documentId || null}
+        title={versionsDocument?.title}
+        onClose={() => setVersionsDocument(null)}
       />
     </div>
   )

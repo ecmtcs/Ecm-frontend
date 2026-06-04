@@ -279,6 +279,12 @@ a:hover {
   text-decoration: underline;
 }
 
+.btn-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
 .btn-view {
   font-size: 0.9rem;
 }
@@ -725,6 +731,86 @@ a:hover {
 
 .table-row:hover {
   background: rgba(59, 130, 246, 0.06);
+}
+
+.table-row--selected {
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.table-row--selected:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.file-table--search th.col-select,
+.file-table--search td.col-select {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: 44px;
+  max-width: 44px;
+  padding-right: 0.5rem;
+  text-align: center;
+  background: var(--surface);
+}
+
+.file-table--search thead th.col-select {
+  z-index: 3;
+  background: var(--surface-elevated);
+}
+
+.table-row--selected td.col-select {
+  background: transparent;
+}
+
+.row-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--primary);
+  vertical-align: middle;
+}
+
+.bulk-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.bulk-actions-count {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.bulk-actions-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.bulk-actions-buttons .btn-sm {
+  margin-top: 0;
+}
+
+.btn-danger {
+  background: var(--error);
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .empty-state {
