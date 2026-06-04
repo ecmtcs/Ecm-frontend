@@ -22,7 +22,16 @@
     },
     {
       "source": "/api/document-delete",
-      "destination": "https://REPLACE_AFTER_DEPLOY.lambda-url.us-east-1.on.aws/"
+      "destination": "https://se7baow2x23g53ctwu6s75mo6y0qciyi.lambda-url.us-east-1.on.aws/"
+
+    },
+    {
+      "source": "/api/document-versions",
+      "destination": "https://3kasyusjjzoo3runlrouojndve0exjbo.lambda-url.us-east-1.on.aws/"
+    },
+    {
+      "source": "/api/document-update",
+      "destination": "https://ycle65oidker4ylrtlumirxk7y0ggjkx.lambda-url.us-east-1.on.aws/"
     },
     {
       "source": "/((?!api/).*)",

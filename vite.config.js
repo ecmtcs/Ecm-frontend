@@ -17,6 +17,14 @@ const DOCUMENT_STATUS_LAMBDA_TARGET =
 const DOCUMENT_DELETE_LAMBDA_TARGET =
   process.env.VITE_DOCUMENT_DELETE_LAMBDA_URL ||
   'https://se7baow2x23g53ctwu6s75mo6y0qciyi.lambda-url.us-east-1.on.aws/'
+// Set after deploying document-versions-lambda (Function URL)
+const DOCUMENT_VERSIONS_LAMBDA_TARGET =
+  process.env.VITE_DOCUMENT_VERSIONS_LAMBDA_URL ||
+  'https://3kasyusjjzoo3runlrouojndve0exjbo.lambda-url.us-east-1.on.aws/'
+// Set after deploying document-update-lambda (Function URL)
+const DOCUMENT_UPDATE_LAMBDA_TARGET =
+  process.env.VITE_DOCUMENT_UPDATE_LAMBDA_URL ||
+  'https://ycle65oidker4ylrtlumirxk7y0ggjkx.lambda-url.us-east-1.on.aws/'
 
 function rewriteApiPrefix(prefix) {
   return (path) => {
@@ -59,8 +67,8 @@ export default defineConfig({
         secure: false,
         rewrite: rewriteApiPrefix(/^\/api\/document-status/),
       },
-      // Negative lookahead: match /api/document but NOT /api/document-status or /api/document-delete
-      '^/api/document(?!-status|-delete)': {
+      // Negative lookahead: match /api/document but NOT the more specific document-* routes
+      '^/api/document(?!-status|-delete|-versions|-update)': {
         target: DOCUMENT_PREVIEW_LAMBDA_TARGET,
         changeOrigin: true,
         secure: false,
@@ -71,6 +79,18 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         rewrite: rewriteApiPrefix(/^\/api\/document-delete/),
+      },
+      '/api/document-versions': {
+        target: DOCUMENT_VERSIONS_LAMBDA_TARGET,
+        changeOrigin: true,
+        secure: false,
+        rewrite: rewriteApiPrefix(/^\/api\/document-versions/),
+      },
+      '/api/document-update': {
+        target: DOCUMENT_UPDATE_LAMBDA_TARGET,
+        changeOrigin: true,
+        secure: false,
+        rewrite: rewriteApiPrefix(/^\/api\/document-update/),
       },
     },
   },
