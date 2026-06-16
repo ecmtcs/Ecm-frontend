@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import RetentionPolicyCell from './RetentionPolicyCell'
 import {
   formatSearchCellValue,
   formatSearchColumnLabel,
@@ -18,6 +20,8 @@ export default function FileList({
   onToggleSelect,
   onToggleSelectAll,
 }) {
+  const [retentionPolicies, setRetentionPolicies] = useState({})
+
   if (!files.length) {
     return (
       <div className="empty-state empty-state--full fade-in">
@@ -29,6 +33,10 @@ export default function FileList({
 
   const columns = getSearchDisplayColumns(files)
   const selectable = Boolean(selectedIds && onToggleSelect)
+
+  function handleAssignRetentionPolicy(documentId, policyId) {
+    setRetentionPolicies((prev) => ({ ...prev, [documentId]: policyId }))
+  }
 
   const selectableIds = selectable
     ? files.map(getDocumentId).filter(Boolean)
@@ -59,6 +67,7 @@ export default function FileList({
             {columns.map((column) => (
               <th key={column}>{formatSearchColumnLabel(column)}</th>
             ))}
+            <th className="col-retention">Retention Policy</th>
             <th className="col-actions">View</th>
             <th className="col-actions">Versions</th>
             <th className="col-actions">Delete</th>
@@ -93,6 +102,16 @@ export default function FileList({
                     {formatSearchCellValue(file[column])}
                   </td>
                 ))}
+                <td className="col-retention">
+                  {documentId ? (
+                    <RetentionPolicyCell
+                      policyId={retentionPolicies[documentId]}
+                      onAssign={(policyId) => handleAssignRetentionPolicy(documentId, policyId)}
+                    />
+                  ) : (
+                    '—'
+                  )}
+                </td>
                 <td className="col-actions">
                   {documentId ? (
                     <button
