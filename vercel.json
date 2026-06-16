@@ -34,6 +34,10 @@
       "destination": "https://ycle65oidker4ylrtlumirxk7y0ggjkx.lambda-url.us-east-1.on.aws/"
     },
     {
+      "source": "/api/s3-object/:host/:path*",
+      "destination": "https://:host/:path*"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
