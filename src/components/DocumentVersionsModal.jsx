@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import {
   demoteDocumentVersion,
   fetchDocumentVersions,
   promoteDocumentVersion,
+  upgradeDocumentVersion,
 } from '../utils/versionApi'
 import './DocumentPreviewModal.css'
 import './DocumentVersionsModal.css'
@@ -22,11 +23,16 @@ function formatDate(value) {
 }
 
 export default function DocumentVersionsModal({ documentId, title, onClose, onChanged }) {
+  const fileInputId = useId()
+  const fileInputRef = useRef(null)
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [versions, setVersions] = useState([])
   const [busyVersionId, setBusyVersionId] = useState('')
+  const [upgradeFile, setUpgradeFile] = useState(null)
+  const [upgrading, setUpgrading] = useState(false)
 
   const load = useCallback(async (id) => {
     setLoading(true)
@@ -45,19 +51,21 @@ export default function DocumentVersionsModal({ documentId, title, onClose, onCh
 
   useEffect(() => {
     if (!documentId) return
+    setUpgradeFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
     load(documentId)
   }, [documentId, load])
 
   useEffect(() => {
     if (!documentId) return undefined
-    const onKeyDown = (e) => e.key === 'Escape' && onClose()
+    const onKeyDown = (e) => e.key === 'Escape' && !upgrading && !busyVersionId && onClose()
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', onKeyDown)
     return () => {
       document.body.style.overflow = ''
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [documentId, onClose])
+  }, [documentId, onClose, upgrading, busyVersionId])
 
   async function runAction(actionFn, busyKey, successMessage) {
     setBusyVersionId(busyKey)
@@ -75,9 +83,35 @@ export default function DocumentVersionsModal({ documentId, title, onClose, onCh
     }
   }
 
+  async function handleUpgradeSubmit(e) {
+    e.preventDefault()
+    if (!upgradeFile || upgrading || busyVersionId) return
+
+    setUpgrading(true)
+    setError('')
+    setNotice('')
+    try {
+      const { versions: list } = await upgradeDocumentVersion(documentId, upgradeFile)
+      setVersions(list)
+      setNotice('New version uploaded. Promote or demote older versions below if needed.')
+      setUpgradeFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      onChanged?.()
+    } catch (err) {
+      setError(err.message || 'Upgrade failed.')
+    } finally {
+      setUpgrading(false)
+    }
+  }
+
+  function handleUpgradeFileChange(e) {
+    setUpgradeFile(e.target.files?.[0] ?? null)
+    setError('')
+  }
+
   if (!documentId) return null
 
-  const busy = Boolean(busyVersionId)
+  const busy = Boolean(busyVersionId) || upgrading
 
   return (
     <div
@@ -85,7 +119,7 @@ export default function DocumentVersionsModal({ documentId, title, onClose, onCh
       role="dialog"
       aria-modal="true"
       aria-labelledby="doc-versions-title"
-      onClick={onClose}
+      onClick={busy ? undefined : onClose}
     >
       <div
         className="doc-preview-modal doc-versions-modal fade-in"
@@ -100,6 +134,7 @@ export default function DocumentVersionsModal({ documentId, title, onClose, onCh
             type="button"
             className="doc-preview-close"
             onClick={onClose}
+            disabled={busy}
             aria-label="Close versions"
           >
             ×
@@ -108,9 +143,35 @@ export default function DocumentVersionsModal({ documentId, title, onClose, onCh
 
         <div className="doc-versions-body">
           <p className="doc-versions-hint text-muted">
-            Promote an older version to make it current, or demote the current version to roll
-            back to the previous one.
+            Upload a new file to replace the current content at the same storage path (creates a
+            new version). Use promote or demote to switch which version is active.
           </p>
+
+          <form className="doc-versions-upgrade" onSubmit={handleUpgradeSubmit}>
+            <div className="doc-versions-upgrade-label">
+              <label htmlFor={fileInputId}>Upgrade (new version)</label>
+              <span className="text-muted">
+                Same S3 key — previous versions are kept (max 5 MB per upload)
+              </span>
+            </div>
+            <div className="doc-versions-upgrade-controls">
+              <input
+                ref={fileInputRef}
+                id={fileInputId}
+                type="file"
+                className="doc-versions-file-input"
+                disabled={busy || loading}
+                onChange={handleUpgradeFileChange}
+              />
+              <button
+                type="submit"
+                className="btn btn-primary btn-sm"
+                disabled={busy || loading || !upgradeFile}
+              >
+                {upgrading ? 'Uploading…' : 'Upload new version'}
+              </button>
+            </div>
+          </form>
 
           {error && <p className="text-danger">{error}</p>}
           {notice && <p className="doc-versions-notice">{notice}</p>}
@@ -123,17 +184,12 @@ export default function DocumentVersionsModal({ documentId, title, onClose, onCh
           ) : versions.length === 0 ? (
             <p className="doc-versions-empty">No versions found for this document.</p>
           ) : (
-            <>
-              {versions.length === 1 && (
-                <p className="doc-versions-single text-muted">
-                  This document has only one version. Upload a new file for it to create more
-                  versions you can promote or demote.
-                </p>
-              )}
-              <ul className="doc-versions-list">
+            <ul className="doc-versions-list">
               {versions.map((version, index) => {
                 const isCurrent = version.isLatest
                 const canDemote = isCurrent && versions.length > 1
+                const versionLabel = versions.length - index
+
                 return (
                   <li
                     key={version.versionId}
@@ -141,7 +197,7 @@ export default function DocumentVersionsModal({ documentId, title, onClose, onCh
                   >
                     <div className="doc-version-meta">
                       <div className="doc-version-title">
-                        <span>Version {versions.length - index}</span>
+                        <span>Version {versionLabel}</span>
                         {isCurrent && <span className="doc-version-badge">Current</span>}
                       </div>
                       <p className="doc-version-sub text-muted">
@@ -201,8 +257,7 @@ export default function DocumentVersionsModal({ documentId, title, onClose, onCh
                   </li>
                 )
               })}
-              </ul>
-            </>
+            </ul>
           )}
         </div>
       </div>

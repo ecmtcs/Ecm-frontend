@@ -12,6 +12,44 @@
   margin: 0 0 1rem;
 }
 
+.doc-versions-upgrade {
+  margin: 0 0 1.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border, #2d3a4f);
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.doc-versions-upgrade-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 0.65rem;
+}
+
+.doc-versions-upgrade-label label {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.doc-versions-upgrade-label .text-muted {
+  font-size: 0.75rem;
+}
+
+.doc-versions-upgrade-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.doc-versions-file-input {
+  flex: 1 1 12rem;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 0.8rem;
+}
+
 .doc-versions-list {
   display: flex;
   flex-direction: column;
