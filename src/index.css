@@ -689,6 +689,19 @@ a:hover {
   vertical-align: top;
 }
 
+.file-table--search th.col-retention,
+.file-table--search td.col-retention {
+  min-width: 9.5rem;
+  max-width: 13rem;
+  padding-right: 1.5rem;
+  white-space: normal;
+  vertical-align: middle;
+}
+
+.file-table--search th.col-retention {
+  letter-spacing: 0.03em;
+}
+
 .file-table--search th.col-actions,
 .file-table--search td.col-actions {
   position: sticky;
